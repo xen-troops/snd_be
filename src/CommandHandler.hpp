@@ -23,6 +23,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include <xen/be/XenGnttab.hpp>
@@ -67,7 +68,7 @@ private:
 
 	typedef void(CommandHandler::*CommandFn)(const xensnd_req& req);
 
-	static CommandFn sCmdTable[];
+	static std::unordered_map<int, CommandFn> sCmdTable;
 
 	int mDomId;
 	std::unique_ptr<XenBackend::XenGnttabBuffer> mBuffer;

@@ -22,7 +22,9 @@
 
 #include <sys/mman.h>
 
+using std::out_of_range;
 using std::vector;
+using std::unordered_map;
 
 using XenBackend::XenException;
 using XenBackend::XenGnttabBuffer;
@@ -60,12 +62,12 @@ CommandHandler::PcmFormat CommandHandler::sPcmFormat[] =
 	{XENSND_PCM_FORMAT_SPECIAL,            SND_PCM_FORMAT_SPECIAL },
 };
 
-CommandHandler::CommandFn CommandHandler::sCmdTable[] =
+unordered_map<int, CommandHandler::CommandFn> CommandHandler::sCmdTable =
 {
-	&CommandHandler::open,
-	&CommandHandler::close,
-	&CommandHandler::read,
-	&CommandHandler::write
+	{XENSND_OP_OPEN,	&CommandHandler::open},
+	{XENSND_OP_CLOSE,	&CommandHandler::close},
+	{XENSND_OP_READ,	&CommandHandler::read},
+	{XENSND_OP_WRITE,	&CommandHandler::write}
 };
 
 /***************************************************************************//**
@@ -95,14 +97,13 @@ uint8_t CommandHandler::processCommand(const xensnd_req& req)
 
 	try
 	{
-		if (req.u.data.operation < (sizeof(sCmdTable) / sizeof(CommandFn)))
-		{
-			(this->*sCmdTable[req.u.data.operation])(req);
-		}
-		else
-		{
-			status = XENSND_RSP_ERROR;
-		}
+		(this->*sCmdTable.at(req.u.data.operation))(req);
+	}
+	catch(const out_of_range& e)
+	{
+		LOG(mLog, ERROR) << e.what();
+
+		status = XENSND_RSP_ERROR;
 	}
 	catch(const AlsaPcmException& e)
 	{
