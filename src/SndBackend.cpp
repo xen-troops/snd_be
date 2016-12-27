@@ -75,14 +75,14 @@ StreamRingBuffer::StreamRingBuffer(int id, Alsa::StreamType type,
 void StreamRingBuffer::processRequest(const xensnd_req& req)
 {
 	DLOG(mLog, DEBUG) << "Request received, id: " << mId
-					  << ", cmd:" << static_cast<int>(req.u.data.operation);
+					  << ", cmd:" << static_cast<int>(req.operation);
 
 	xensnd_resp rsp {};
 
-	rsp.u.data.id = req.u.data.id;
-	rsp.u.data.stream_idx = req.u.data.stream_idx;
-	rsp.u.data.operation = req.u.data.operation;
-	rsp.u.data.status = mCommandHandler.processCommand(req);
+	rsp.id = req.id;
+	rsp.stream_idx = req.stream_idx;
+	rsp.operation = req.operation;
+	rsp.status = mCommandHandler.processCommand(req);
 
 	sendResponse(rsp);
 }
@@ -93,23 +93,7 @@ void StreamRingBuffer::processRequest(const xensnd_req& req)
 
 void SndFrontendHandler::onBind()
 {
-	string cardBasePath = getXsFrontendPath() + "/" + XENSND_PATH_CARD;
-
-	const vector<string> cards = getXenStore().readDirectory(cardBasePath);
-
-	LOG(mLog, DEBUG) << "On frontend bind : " << getDomId();
-
-	if (cards.size() == 0)
-	{
-		LOG(mLog, WARNING) << "No sound cards found : " << getDomId();
-	}
-
-	for(auto cardId : cards)
-	{
-		LOG(mLog, DEBUG) << "Found card: " << cardId;
-
-		processCard(cardBasePath + "/" + cardId);
-	}
+	processCard(getXsFrontendPath());
 }
 
 void SndFrontendHandler::processCard(const std::string& cardPath)

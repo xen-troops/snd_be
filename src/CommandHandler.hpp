@@ -33,7 +33,7 @@
 
 extern "C" {
 #include "pack.h"
-#include "sndif_linux.h"
+#include "sndif.h"
 }
 
 /**
@@ -82,7 +82,7 @@ private:
 	void read(const xensnd_req& req);
 	void write(const xensnd_req& req);
 
-	void getBufferRefs(grant_ref_t startDirectory, std::vector<grant_ref_t>& refs);
+	void getBufferRefs(grant_ref_t startDirectory, uint32_t size, std::vector<grant_ref_t>& refs);
 	snd_pcm_format_t convertPcmFormat(uint8_t format);
 };
 

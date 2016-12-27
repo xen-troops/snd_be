@@ -59,7 +59,6 @@ CommandHandler::PcmFormat CommandHandler::sPcmFormat[] =
 	{XENSND_PCM_FORMAT_IMA_ADPCM,          SND_PCM_FORMAT_IMA_ADPCM },
 	{XENSND_PCM_FORMAT_MPEG,               SND_PCM_FORMAT_MPEG },
 	{XENSND_PCM_FORMAT_GSM,                SND_PCM_FORMAT_GSM },
-	{XENSND_PCM_FORMAT_SPECIAL,            SND_PCM_FORMAT_SPECIAL },
 };
 
 unordered_map<int, CommandHandler::CommandFn> CommandHandler::sCmdTable =
@@ -97,7 +96,7 @@ uint8_t CommandHandler::processCommand(const xensnd_req& req)
 
 	try
 	{
-		(this->*sCmdTable.at(req.u.data.operation))(req);
+		(this->*sCmdTable.at(req.operation))(req);
 	}
 	catch(const out_of_range& e)
 	{
@@ -125,11 +124,11 @@ void CommandHandler::open(const xensnd_req& req)
 {
 	DLOG(mLog, DEBUG) << "Handle command [OPEN]";
 
-	const xensnd_open_req& openReq = req.u.data.op.open;
+	const xensnd_open_req& openReq = req.op.open;
 
 	vector<grant_ref_t> refs;
 
-	getBufferRefs(openReq.gref_directory_start, refs);
+	getBufferRefs(openReq.gref_directory_start, openReq.buffer_sz, refs);
 
 	mBuffer.reset(new XenGnttabBuffer(mDomId, refs.data(), refs.size(),
 									  PROT_READ | PROT_WRITE));
@@ -151,7 +150,7 @@ void CommandHandler::read(const xensnd_req& req)
 {
 	DLOG(mLog, DEBUG) << "Handle command [READ]";
 
-	const xensnd_read_req& readReq = req.u.data.op.read;
+	const xensnd_rw_req& readReq = req.op.rw;
 
 	mAlsaPcm.read(&(static_cast<uint8_t*>(mBuffer->get())[readReq.offset]),
 				  readReq.len);
@@ -161,35 +160,43 @@ void CommandHandler::write(const xensnd_req& req)
 {
 	DLOG(mLog, DEBUG) << "Handle command [WRITE]";
 
-	const xensnd_write_req& writeReq = req.u.data.op.write;
+	const xensnd_rw_req& writeReq = req.op.rw;
 
 	mAlsaPcm.write(&(static_cast<uint8_t*>(mBuffer->get())[writeReq.offset]),
 				   writeReq.len);
 }
 
-void CommandHandler::getBufferRefs(grant_ref_t startDirectory,
+void CommandHandler::getBufferRefs(grant_ref_t startDirectory, uint32_t size,
 								   vector<grant_ref_t>& refs)
 {
 	refs.clear();
 
-	do
+	size_t requestedNumGrefs = (size + XC_PAGE_SIZE - 1) / XC_PAGE_SIZE;
+
+	DLOG(mLog, DEBUG) << "Get buffer refs, directory: " << startDirectory
+					  << ", size: " << size
+					  << ", in grefs: " << requestedNumGrefs;
+
+
+	while(startDirectory != 0)
 	{
 
-		XenGnttabBuffer pageBuffer(mDomId, startDirectory,
-								   PROT_READ | PROT_WRITE);
+		XenGnttabBuffer pageBuffer(mDomId, startDirectory);
+
 		xensnd_page_directory* pageDirectory =
 				static_cast<xensnd_page_directory*>(pageBuffer.get());
 
-		DLOG(mLog, DEBUG) << "Get buffer refs, directory: " << startDirectory
-						  << ", num refs: " << pageDirectory->num_grefs;
+		size_t numGrefs = std::min(requestedNumGrefs, (XC_PAGE_SIZE -
+							  offsetof(xensnd_page_directory, gref)) / sizeof(uint32_t));
+
+		DLOG(mLog, ERROR) << "Gref address: " << pageDirectory->gref << "numGrefs " << numGrefs;
 
 		refs.insert(refs.end(), pageDirectory->gref,
-					pageDirectory->gref + pageDirectory->num_grefs);
+					pageDirectory->gref + numGrefs);
+		requestedNumGrefs -= numGrefs;
 
 		startDirectory = pageDirectory->gref_dir_next_page;
-
 	}
-	while(startDirectory != 0);
 
 	DLOG(mLog, DEBUG) << "Get buffer refs, num refs: " << refs.size();
 }
