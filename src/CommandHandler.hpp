@@ -31,10 +31,7 @@
 
 #include "AlsaPcm.hpp"
 
-extern "C" {
-#include "pack.h"
-#include "sndif.h"
-}
+#include <xen/io/sndif.h>
 
 /**
  * Handles commands received from the frontend.
