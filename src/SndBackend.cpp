@@ -54,14 +54,12 @@ using XenBackend::RingBufferBase;
 using XenBackend::RingBufferInBase;
 using XenBackend::XenStore;
 
-unique_ptr <SndBackend> gSndBackend;
-
 /***************************************************************************//**
  * StreamRingBuffer
  ******************************************************************************/
 
-StreamRingBuffer::StreamRingBuffer(int id, Alsa::StreamType type,
-								   int domId, int port, int ref) :
+StreamRingBuffer::StreamRingBuffer(int id, Alsa::StreamType type, domid_t domId,
+								   evtchn_port_t port, grant_ref_t ref) :
 	RingBufferInBase<xen_sndif_back_ring, xen_sndif_sring,
 					 xensnd_req, xensnd_resp>(domId, port, ref),
 	mId(id),
@@ -163,20 +161,15 @@ void SndFrontendHandler::createStream(int id, Alsa::StreamType type,
  * SndBackend
  ******************************************************************************/
 
-void SndBackend::onNewFrontend(int domId, int id)
+void SndBackend::onNewFrontend(domid_t domId, int id)
 {
 	addFrontendHandler(shared_ptr<FrontendHandlerBase>(
-					   new SndFrontendHandler(domId, *this, id)));
+					   new SndFrontendHandler(*this, domId, id)));
 }
 
 /***************************************************************************//**
  *
  ******************************************************************************/
-
-void terminateHandler(int signal)
-{
-	gSndBackend->stop();
-}
 
 void segmentationHandler(int sig)
 {
@@ -194,9 +187,20 @@ void segmentationHandler(int sig)
 
 void registerSignals()
 {
-	signal(SIGINT, terminateHandler);
-	signal(SIGTERM, terminateHandler);
 	signal(SIGSEGV, segmentationHandler);
+}
+
+void waitSignals()
+{
+	sigset_t set;
+	int signal;
+
+	sigemptyset(&set);
+	sigaddset(&set, SIGINT);
+	sigaddset(&set, SIGTERM);
+	sigprocmask(SIG_BLOCK, &set, nullptr);
+
+	sigwait(&set,&signal);
 }
 
 bool commandLineOptions(int argc, char *argv[])
@@ -236,9 +240,11 @@ int main(int argc, char *argv[])
 
 		if (commandLineOptions(argc, argv))
 		{
-			gSndBackend.reset(new SndBackend(0, XENSND_DRIVER_NAME));
+			SndBackend sndBackend("SndBackend", XENSND_DRIVER_NAME, 0);
 
-			gSndBackend->run();
+			sndBackend.start();
+
+			waitSignals();
 		}
 		else
 		{

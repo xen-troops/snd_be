@@ -51,8 +51,8 @@ public:
 	 * @param port  event channel port number
 	 * @param ref   grant table reference
 	 */
-	StreamRingBuffer(int id, Alsa::StreamType type, int domId,
-					 int port, int ref);
+	StreamRingBuffer(int id, Alsa::StreamType type, domid_t domId,
+					 evtchn_port_t port, grant_ref_t ref);
 
 private:
 	int mId;
@@ -75,8 +75,9 @@ public:
 	 * @param backend backend instance
 	 * @param id      frontend instance id
 	 */
-	SndFrontendHandler(int domId, XenBackend::BackendBase& backend, int id) :
-		FrontendHandlerBase(domId, backend, id),
+	SndFrontendHandler(XenBackend::BackendBase& backend, domid_t domId,
+					   int id) :
+		FrontendHandlerBase("SndFrontend", backend, domId, id),
 		mLog("SndFrontend") {}
 
 protected:
@@ -112,7 +113,7 @@ protected:
 	 * @param domId domain id
 	 * @param id    instance id
 	 */
-	void onNewFrontend(int domId, int id);
+	void onNewFrontend(domid_t domId, int id);
 };
 
 #endif /* INCLUDE_SNDBACKEND_HPP_ */
