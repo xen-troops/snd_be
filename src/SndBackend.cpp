@@ -41,16 +41,15 @@
 using std::cout;
 using std::endl;
 using std::exception;
-using std::shared_ptr;
 using std::signal;
 using std::string;
 using std::to_string;
 using std::unique_ptr;
 using std::vector;
 
-using XenBackend::FrontendHandlerBase;
+using XenBackend::FrontendHandlerPtr;
 using XenBackend::Log;
-using XenBackend::RingBufferBase;
+using XenBackend::RingBufferPtr;
 using XenBackend::RingBufferInBase;
 using XenBackend::XenStore;
 
@@ -151,7 +150,7 @@ void SndFrontendHandler::createStream(int id, Alsa::StreamType type,
 	LOG(mLog, DEBUG) << "Read ring buffer ref: " << ref
 					 << ", dom: " << getDomId();
 
-	shared_ptr<RingBufferBase> ringBuffer(
+	RingBufferPtr ringBuffer(
 			new StreamRingBuffer(id, type, getDomId(), port, ref));
 
 	addRingBuffer(ringBuffer);
@@ -163,7 +162,7 @@ void SndFrontendHandler::createStream(int id, Alsa::StreamType type,
 
 void SndBackend::onNewFrontend(domid_t domId, int id)
 {
-	addFrontendHandler(shared_ptr<FrontendHandlerBase>(
+	addFrontendHandler(FrontendHandlerPtr(
 					   new SndFrontendHandler(*this, domId, id)));
 }
 
