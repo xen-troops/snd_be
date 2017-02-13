@@ -67,53 +67,58 @@ void AlsaPcm::open(const AlsaPcmParams& params)
 		snd_pcm_stream_t streamType = mType == StreamType::PLAYBACK ?
 				SND_PCM_STREAM_PLAYBACK : SND_PCM_STREAM_CAPTURE;
 
-		if (snd_pcm_open(&mHandle, mName.c_str(), streamType, 0) < 0)
+		int ret = 0;
+
+		if (ret = snd_pcm_open(&mHandle, mName.c_str(), streamType, 0) < 0)
 		{
-			throw AlsaPcmException("Can't open audio device " + mName);
+			throw AlsaPcmException("Can't open audio device " + mName, -ret);
 		}
 
-		if (snd_pcm_hw_params_malloc(&hwParams) < 0)
+		if (ret = snd_pcm_hw_params_malloc(&hwParams) < 0)
 		{
-			throw AlsaPcmException("Can't allocate hw params " + mName);
+			throw AlsaPcmException("Can't allocate hw params " + mName, -ret);
 		}
 
-		if (snd_pcm_hw_params_any(mHandle, hwParams) < 0)
+		if (ret = snd_pcm_hw_params_any(mHandle, hwParams) < 0)
 		{
-			throw AlsaPcmException("Can't allocate hw params " + mName);
+			throw AlsaPcmException("Can't allocate hw params " + mName, -ret);
 		}
 
-		if (snd_pcm_hw_params_set_access(mHandle, hwParams,
-										 SND_PCM_ACCESS_RW_INTERLEAVED) < 0)
+		if (ret = snd_pcm_hw_params_set_access(mHandle, hwParams,
+				SND_PCM_ACCESS_RW_INTERLEAVED) < 0)
 		{
-			throw AlsaPcmException("Can't set access " + mName);
+			throw AlsaPcmException("Can't set access " + mName, -ret);
 		}
 
-		if (snd_pcm_hw_params_set_format(mHandle, hwParams, params.format) < 0)
+		if (ret = snd_pcm_hw_params_set_format(mHandle, hwParams,
+											   params.format) < 0)
 		{
-			throw AlsaPcmException("Can't set format " + mName);
+			throw AlsaPcmException("Can't set format " + mName, -ret);
 		}
 
 		unsigned int rate = params.rate;
 
-		if (snd_pcm_hw_params_set_rate_near(mHandle, hwParams, &rate, 0) < 0)
+		if (ret = snd_pcm_hw_params_set_rate_near(mHandle, hwParams,
+												  &rate, 0) < 0)
 		{
-			throw AlsaPcmException("Can't set rate " + mName);
+			throw AlsaPcmException("Can't set rate " + mName, -ret);
 		}
 
-		if (snd_pcm_hw_params_set_channels(mHandle, hwParams,
-										   params.numChannels) < 0)
+		if (ret = snd_pcm_hw_params_set_channels(mHandle, hwParams,
+												 params.numChannels) < 0)
 		{
-			throw AlsaPcmException("Can't set channels " + mName);
+			throw AlsaPcmException("Can't set channels " + mName, -ret);
 		}
 
-		if (snd_pcm_hw_params(mHandle, hwParams) < 0)
+		if (ret = snd_pcm_hw_params(mHandle, hwParams) < 0)
 		{
-			throw AlsaPcmException("Can't set hwParams " + mName);
+			throw AlsaPcmException("Can't set hwParams " + mName, -ret);
 		}
 
-		if (snd_pcm_prepare(mHandle) < 0)
+		if (ret = snd_pcm_prepare(mHandle) < 0)
 		{
-			throw AlsaPcmException("Can't prepare audio interface for use");
+			throw AlsaPcmException(
+					"Can't prepare audio interface for use", -ret);
 		}
 	}
 	catch(const AlsaPcmException& e)
@@ -164,7 +169,7 @@ void AlsaPcm::read(uint8_t* buffer, ssize_t size)
 			{
 				throw AlsaPcmException("Read from audio interface failed: " +
 									   mName + ". Error: " +
-									   snd_strerror(status));
+									   snd_strerror(status), -status);
 			}
 			else
 			{
@@ -196,7 +201,7 @@ void AlsaPcm::write(uint8_t* buffer, ssize_t size)
 			{
 				throw AlsaPcmException("Write to audio interface failed: " +
 									   mName + ". Error: " +
-									   snd_strerror(status));
+									   snd_strerror(status), -status);
 			}
 			else
 			{

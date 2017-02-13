@@ -52,7 +52,7 @@ public:
 	 * @param req
 	 * @return
 	 */
-	uint8_t processCommand(const xensnd_req& req);
+	int processCommand(const xensnd_req& req);
 
 private:
 	struct PcmFormat
