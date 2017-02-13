@@ -50,15 +50,22 @@ public:
 	/**
 	 * @param msg error message
 	 */
-	explicit AlsaPcmException(const std::string& msg) : mMsg(msg) {};
+	explicit AlsaPcmException(const std::string& msg, int errCode) :
+		mMsg(msg), mErrCode(errCode) {};
 
 	/**
 	 * returns error message
 	 */
-	const char* what() const throw() { return mMsg.c_str(); };
+	const char* what() const throw() override { return mMsg.c_str(); }
+
+	/**
+	 * returns error code
+	 */
+	int getErrno() const { return mErrCode; }
 
 private:
 	std::string mMsg;
+	int mErrCode;
 };
 
 /***************************************************************************//**

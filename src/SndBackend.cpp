@@ -77,7 +77,6 @@ void StreamRingBuffer::processRequest(const xensnd_req& req)
 	xensnd_resp rsp {};
 
 	rsp.id = req.id;
-	rsp.stream_idx = req.stream_idx;
 	rsp.operation = req.operation;
 	rsp.status = mCommandHandler.processCommand(req);
 
@@ -90,44 +89,43 @@ void StreamRingBuffer::processRequest(const xensnd_req& req)
 
 void SndFrontendHandler::onBind()
 {
-	processCard(getXsFrontendPath());
+	processCard(getXsFrontendPath() + "/");
 }
 
 void SndFrontendHandler::processCard(const std::string& cardPath)
 {
-	string devBasePath = cardPath + "/" + XENSND_PATH_DEVICE;
+	int devIndex = 0;
 
-	const vector<string> devs = getXenStore().readDirectory(devBasePath);
-
-	for(auto devId : devs)
+	while(getXenStore().checkIfExist(cardPath + to_string(devIndex)))
 	{
-		LOG(mLog, DEBUG) << "Found device: " << devId;
+		LOG(mLog, DEBUG) << "Found device: " << devIndex;
 
-		processDevice(devBasePath + "/" + devId);
+		processDevice(cardPath + to_string(devIndex) + "/");
+
+		devIndex++;
 	}
 }
 
 void SndFrontendHandler::processDevice(const std::string& devPath)
 {
-	string streamBasePath = devPath + "/" + XENSND_PATH_STREAM;
+	int streamIndex = 0;
 
-	const vector<string> streams = getXenStore().readDirectory(streamBasePath);
-
-	for(auto streamId : streams)
+	while(getXenStore().checkIfExist(devPath + to_string(streamIndex)))
 	{
-		LOG(mLog, DEBUG) << "Found stream: " << streamId;
+		LOG(mLog, DEBUG) << "Found stream: " << streamIndex;
 
-		processStream(streamBasePath + "/" + streamId);
+		processStream(devPath + to_string(streamIndex) + "/");
+
+		streamIndex++;
 	}
 }
 
 void SndFrontendHandler::processStream(const std::string& streamPath)
 {
-	int id = getXenStore().readInt(streamPath + "/" +
-								   XENSND_FIELD_STREAM_INDEX);
+	int id = getXenStore().readInt(streamPath + XENSND_FIELD_STREAM_UNIQUE_ID);
 	Alsa::StreamType streamType = Alsa::StreamType::PLAYBACK;
 
-	if (getXenStore().readString(streamPath + "/" + XENSND_FIELD_TYPE) ==
+	if (getXenStore().readString(streamPath + XENSND_FIELD_TYPE) ==
 		XENSND_STREAM_TYPE_CAPTURE)
 	{
 		streamType = Alsa::StreamType::CAPTURE;
@@ -139,13 +137,12 @@ void SndFrontendHandler::processStream(const std::string& streamPath)
 void SndFrontendHandler::createStream(int id, Alsa::StreamType type,
 									  const string& streamPath)
 {
-	auto port = getXenStore().readInt(streamPath + "/" + XENSND_FIELD_EVT_CHNL);
+	auto port = getXenStore().readInt(streamPath + XENSND_FIELD_EVT_CHNL);
 
 	LOG(mLog, DEBUG) << "Read event channel port: " << port
 					 << ", dom: " << getDomId();
 
-	uint32_t ref = getXenStore().readInt(streamPath + "/" +
-										 XENSND_FIELD_RING_REF);
+	uint32_t ref = getXenStore().readInt(streamPath + XENSND_FIELD_RING_REF);
 
 	LOG(mLog, DEBUG) << "Read ring buffer ref: " << ref
 					 << ", dom: " << getDomId();

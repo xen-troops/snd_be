@@ -22,6 +22,8 @@
 
 #include <sys/mman.h>
 
+#include <xen/errno.h>
+
 using std::out_of_range;
 using std::vector;
 using std::unordered_map;
@@ -90,9 +92,9 @@ CommandHandler::~CommandHandler()
  * Public
  ******************************************************************************/
 
-uint8_t CommandHandler::processCommand(const xensnd_req& req)
+int CommandHandler::processCommand(const xensnd_req& req)
 {
-	uint8_t status = XENSND_RSP_OKAY;
+	int status = 0;
 
 	try
 	{
@@ -102,16 +104,16 @@ uint8_t CommandHandler::processCommand(const xensnd_req& req)
 	{
 		LOG(mLog, ERROR) << e.what();
 
-		status = XENSND_RSP_ERROR;
+		status = XEN_EINVAL;
 	}
 	catch(const AlsaPcmException& e)
 	{
 		LOG(mLog, ERROR) << e.what();
 
-		status = XENSND_RSP_ERROR;
+		status = e.getErrno();
 	}
 
-	DLOG(mLog, DEBUG) << "Return status: [" << static_cast<int>(status) << "]";
+	DLOG(mLog, DEBUG) << "Return status: [" << status << "]";
 
 	return status;
 }
@@ -128,7 +130,7 @@ void CommandHandler::open(const xensnd_req& req)
 
 	vector<grant_ref_t> refs;
 
-	getBufferRefs(openReq.gref_directory_start, openReq.buffer_sz, refs);
+	getBufferRefs(openReq.gref_directory, openReq.buffer_sz, refs);
 
 	mBuffer.reset(new XenGnttabBuffer(mDomId, refs.data(), refs.size(),
 									  PROT_READ | PROT_WRITE));
@@ -153,7 +155,7 @@ void CommandHandler::read(const xensnd_req& req)
 	const xensnd_rw_req& readReq = req.op.rw;
 
 	mAlsaPcm.read(&(static_cast<uint8_t*>(mBuffer->get())[readReq.offset]),
-				  readReq.len);
+				  readReq.length);
 }
 
 void CommandHandler::write(const xensnd_req& req)
@@ -163,7 +165,7 @@ void CommandHandler::write(const xensnd_req& req)
 	const xensnd_rw_req& writeReq = req.op.rw;
 
 	mAlsaPcm.write(&(static_cast<uint8_t*>(mBuffer->get())[writeReq.offset]),
-				   writeReq.len);
+				   writeReq.length);
 }
 
 void CommandHandler::getBufferRefs(grant_ref_t startDirectory, uint32_t size,
@@ -211,5 +213,5 @@ snd_pcm_format_t CommandHandler::convertPcmFormat(uint8_t format)
 		}
 	}
 
-	throw AlsaPcmException("Can't convert format");
+	throw AlsaPcmException("Can't convert format", XEN_EINVAL);
 }

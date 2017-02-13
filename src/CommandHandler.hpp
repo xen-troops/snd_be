@@ -50,9 +50,9 @@ public:
 	/**
 	 * Processes commands received from the frontend.
 	 * @param req
-	 * @return
+	 * @return status
 	 */
-	uint8_t processCommand(const xensnd_req& req);
+	int processCommand(const xensnd_req& req);
 
 private:
 	struct PcmFormat
