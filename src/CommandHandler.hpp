@@ -50,7 +50,7 @@ public:
 	/**
 	 * Processes commands received from the frontend.
 	 * @param req
-	 * @return
+	 * @return status
 	 */
 	int processCommand(const xensnd_req& req);
 

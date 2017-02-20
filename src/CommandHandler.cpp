@@ -24,6 +24,7 @@
 
 #include <xen/errno.h>
 
+using std::min;
 using std::out_of_range;
 using std::vector;
 using std::unordered_map;
@@ -113,7 +114,7 @@ int CommandHandler::processCommand(const xensnd_req& req)
 		status = e.getErrno();
 	}
 
-	DLOG(mLog, DEBUG) << "Return status: [" << static_cast<int>(status) << "]";
+	DLOG(mLog, DEBUG) << "Return status: [" << status << "]";
 
 	return status;
 }
@@ -188,13 +189,16 @@ void CommandHandler::getBufferRefs(grant_ref_t startDirectory, uint32_t size,
 		xensnd_page_directory* pageDirectory =
 				static_cast<xensnd_page_directory*>(pageBuffer.get());
 
-		size_t numGrefs = std::min(requestedNumGrefs, (XC_PAGE_SIZE -
-							  offsetof(xensnd_page_directory, gref)) / sizeof(uint32_t));
+		size_t numGrefs = min(requestedNumGrefs, (XC_PAGE_SIZE -
+							  offsetof(xensnd_page_directory, gref)) /
+							  sizeof(uint32_t));
 
-		DLOG(mLog, ERROR) << "Gref address: " << pageDirectory->gref << "numGrefs " << numGrefs;
+		DLOG(mLog, ERROR) << "Gref address: " << pageDirectory->gref
+						  << ", numGrefs " << numGrefs;
 
 		refs.insert(refs.end(), pageDirectory->gref,
 					pageDirectory->gref + numGrefs);
+
 		requestedNumGrefs -= numGrefs;
 
 		startDirectory = pageDirectory->gref_dir_next_page;
