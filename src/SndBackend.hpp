@@ -76,8 +76,8 @@ public:
 	 * @param id      frontend instance id
 	 */
 	SndFrontendHandler(XenBackend::BackendBase& backend, domid_t domId,
-					   int id) :
-		FrontendHandlerBase("SndFrontend", backend, domId, id),
+					   uint16_t devId) :
+		FrontendHandlerBase("SndFrontend", backend, domId, devId),
 		mLog("SndFrontend") {}
 
 protected:
@@ -111,9 +111,9 @@ protected:
 	/**
 	 * Is called when new sound frontend appears.
 	 * @param domId domain id
-	 * @param id    instance id
+	 * @param devId device id
 	 */
-	void onNewFrontend(domid_t domId, int id);
+	void onNewFrontend(domid_t domId, uint16_t devId);
 };
 
 #endif /* INCLUDE_SNDBACKEND_HPP_ */
