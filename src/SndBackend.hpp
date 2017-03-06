@@ -75,9 +75,11 @@ public:
 	 * @param backend backend instance
 	 * @param id      frontend instance id
 	 */
-	SndFrontendHandler(XenBackend::BackendBase& backend, domid_t domId,
-					   uint16_t devId) :
-		FrontendHandlerBase("SndFrontend", backend, domId, devId),
+	SndFrontendHandler(const std::string devName,
+					   domid_t beDomId, domid_t feDomId,
+					   uint16_t beDevId, uint16_t feDevId) :
+		FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId,
+							beDevId, feDevId),
 		mLog("SndFrontend") {}
 
 protected:

@@ -159,8 +159,8 @@ void SndFrontendHandler::createStream(int id, Alsa::StreamType type,
 
 void SndBackend::onNewFrontend(domid_t domId, uint16_t devId)
 {
-	addFrontendHandler(FrontendHandlerPtr(
-					   new SndFrontendHandler(*this, domId, devId)));
+	addFrontendHandler(FrontendHandlerPtr(new SndFrontendHandler(
+			getDeviceName(), getDomId(), domId, getDevId(), devId)));
 }
 
 /***************************************************************************//**
