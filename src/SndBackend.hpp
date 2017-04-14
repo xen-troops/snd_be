@@ -76,10 +76,8 @@ public:
 	 * @param id      frontend instance id
 	 */
 	SndFrontendHandler(const std::string devName,
-					   domid_t beDomId, domid_t feDomId,
-					   uint16_t beDevId, uint16_t feDevId) :
-		FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId,
-							beDevId, feDevId),
+					   domid_t beDomId, domid_t feDomId, uint16_t devId) :
+		FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId, devId),
 		mLog("SndFrontend") {}
 
 protected:
@@ -87,7 +85,12 @@ protected:
 	/**
 	 * Is called on connected state when ring buffers binding is required.
 	 */
-	void onBind();
+	void onBind() override;
+
+	/**
+	 * Is called on connected state when ring buffers releases are required.
+	 */
+	void onClosing() override;
 
 private:
 

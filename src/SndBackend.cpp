@@ -89,7 +89,14 @@ void StreamRingBuffer::processRequest(const xensnd_req& req)
 
 void SndFrontendHandler::onBind()
 {
+	LOG(mLog, DEBUG) << "onBind";
+
 	processCard(getXsFrontendPath() + "/");
+}
+
+void SndFrontendHandler::onClosing()
+{
+	LOG(mLog, DEBUG) << "onClosing";
 }
 
 void SndFrontendHandler::processCard(const std::string& cardPath)
@@ -160,7 +167,7 @@ void SndFrontendHandler::createStream(int id, Alsa::StreamType type,
 void SndBackend::onNewFrontend(domid_t domId, uint16_t devId)
 {
 	addFrontendHandler(FrontendHandlerPtr(new SndFrontendHandler(
-			getDeviceName(), getDomId(), domId, getDevId(), devId)));
+			getDeviceName(), getDomId(), domId, devId)));
 }
 
 /***************************************************************************//**
@@ -241,6 +248,8 @@ int main(int argc, char *argv[])
 			sndBackend.start();
 
 			waitSignals();
+
+			sndBackend.stop();
 		}
 		else
 		{
