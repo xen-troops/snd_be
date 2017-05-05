@@ -18,8 +18,8 @@
  * Copyright (C) 2016 EPAM Systems Inc.
  */
 
-#ifndef INCLUDE_SNDBACKEND_HPP_
-#define INCLUDE_SNDBACKEND_HPP_
+#ifndef SRC_SNDBACKEND_HPP_
+#define SRC_SNDBACKEND_HPP_
 
 #include <xen/be/BackendBase.hpp>
 #include <xen/be/FrontendHandlerBase.hpp>
@@ -51,7 +51,7 @@ public:
 	 * @param port  event channel port number
 	 * @param ref   grant table reference
 	 */
-	StreamRingBuffer(int id, Alsa::StreamType type, domid_t domId,
+	StreamRingBuffer(int id, SoundItf::StreamType type, domid_t domId,
 					 evtchn_port_t port, grant_ref_t ref);
 
 private:
@@ -96,7 +96,7 @@ private:
 
 	XenBackend::Log mLog;
 
-	void createStream(int id, Alsa::StreamType type,
+	void createStream(int id, SoundItf::StreamType type,
 					  const std::string& streamPath);
 	void processCard(const std::string& cardPath);
 	void processDevice(const std::string& devPath);
@@ -121,4 +121,4 @@ protected:
 	void onNewFrontend(domid_t domId, uint16_t devId);
 };
 
-#endif /* INCLUDE_SNDBACKEND_HPP_ */
+#endif /* SRC_SNDBACKEND_HPP_ */

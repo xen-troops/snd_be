@@ -53,11 +53,14 @@ using XenBackend::RingBufferPtr;
 using XenBackend::RingBufferInBase;
 using XenBackend::XenStore;
 
-/***************************************************************************//**
+using SoundItf::StreamType;
+
+/*******************************************************************************
  * StreamRingBuffer
  ******************************************************************************/
 
-StreamRingBuffer::StreamRingBuffer(int id, Alsa::StreamType type, domid_t domId,
+StreamRingBuffer::StreamRingBuffer(int id, SoundItf::StreamType type,
+								   domid_t domId,
 								   evtchn_port_t port, grant_ref_t ref) :
 	RingBufferInBase<xen_sndif_back_ring, xen_sndif_sring,
 					 xensnd_req, xensnd_resp>(domId, port, ref),
@@ -83,7 +86,7 @@ void StreamRingBuffer::processRequest(const xensnd_req& req)
 	sendResponse(rsp);
 }
 
-/***************************************************************************//**
+/*******************************************************************************
  * SndFrontendHandler
  ******************************************************************************/
 
@@ -130,18 +133,18 @@ void SndFrontendHandler::processDevice(const std::string& devPath)
 void SndFrontendHandler::processStream(const std::string& streamPath)
 {
 	int id = getXenStore().readInt(streamPath + XENSND_FIELD_STREAM_UNIQUE_ID);
-	Alsa::StreamType streamType = Alsa::StreamType::PLAYBACK;
+	StreamType streamType = StreamType::PLAYBACK;
 
 	if (getXenStore().readString(streamPath + XENSND_FIELD_TYPE) ==
 		XENSND_STREAM_TYPE_CAPTURE)
 	{
-		streamType = Alsa::StreamType::CAPTURE;
+		streamType = StreamType::CAPTURE;
 	}
 
 	createStream(id, streamType, streamPath);
 }
 
-void SndFrontendHandler::createStream(int id, Alsa::StreamType type,
+void SndFrontendHandler::createStream(int id, StreamType type,
 									  const string& streamPath)
 {
 	auto port = getXenStore().readInt(streamPath + XENSND_FIELD_EVT_CHNL);
@@ -160,7 +163,7 @@ void SndFrontendHandler::createStream(int id, Alsa::StreamType type,
 	addRingBuffer(ringBuffer);
 }
 
-/***************************************************************************//**
+/*******************************************************************************
  * SndBackend
  ******************************************************************************/
 
@@ -170,7 +173,7 @@ void SndBackend::onNewFrontend(domid_t domId, uint16_t devId)
 			getDeviceName(), getDomId(), domId, devId)));
 }
 
-/***************************************************************************//**
+/*******************************************************************************
  *
  ******************************************************************************/
 

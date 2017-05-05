@@ -32,37 +32,9 @@ using std::unordered_map;
 using XenBackend::XenException;
 using XenBackend::XenGnttabBuffer;
 
-using Alsa::AlsaPcmException;
-using Alsa::AlsaPcmParams;
-
-CommandHandler::PcmFormat CommandHandler::sPcmFormat[] =
-{
-	{XENSND_PCM_FORMAT_U8,                 SND_PCM_FORMAT_U8 },
-	{XENSND_PCM_FORMAT_S8,                 SND_PCM_FORMAT_S8 },
-	{XENSND_PCM_FORMAT_U16_LE,             SND_PCM_FORMAT_U16_LE },
-	{XENSND_PCM_FORMAT_U16_BE,             SND_PCM_FORMAT_U16_BE },
-	{XENSND_PCM_FORMAT_S16_LE,             SND_PCM_FORMAT_S16_LE },
-	{XENSND_PCM_FORMAT_S16_BE,             SND_PCM_FORMAT_S16_BE },
-	{XENSND_PCM_FORMAT_U24_LE,             SND_PCM_FORMAT_U24_LE },
-	{XENSND_PCM_FORMAT_U24_BE,             SND_PCM_FORMAT_U24_BE },
-	{XENSND_PCM_FORMAT_S24_LE,             SND_PCM_FORMAT_S24_LE },
-	{XENSND_PCM_FORMAT_S24_BE,             SND_PCM_FORMAT_S24_BE },
-	{XENSND_PCM_FORMAT_U32_LE,             SND_PCM_FORMAT_U32_LE },
-	{XENSND_PCM_FORMAT_U32_BE,             SND_PCM_FORMAT_U32_BE },
-	{XENSND_PCM_FORMAT_S32_LE,             SND_PCM_FORMAT_S32_LE },
-	{XENSND_PCM_FORMAT_S32_BE,             SND_PCM_FORMAT_S32_BE },
-	{XENSND_PCM_FORMAT_A_LAW,              SND_PCM_FORMAT_A_LAW },
-	{XENSND_PCM_FORMAT_MU_LAW,             SND_PCM_FORMAT_MU_LAW },
-	{XENSND_PCM_FORMAT_F32_LE,             SND_PCM_FORMAT_FLOAT_LE },
-	{XENSND_PCM_FORMAT_F32_BE,             SND_PCM_FORMAT_FLOAT_BE },
-	{XENSND_PCM_FORMAT_F64_LE,             SND_PCM_FORMAT_FLOAT64_LE },
-	{XENSND_PCM_FORMAT_F64_BE,             SND_PCM_FORMAT_FLOAT64_BE },
-	{XENSND_PCM_FORMAT_IEC958_SUBFRAME_LE, SND_PCM_FORMAT_IEC958_SUBFRAME_LE },
-	{XENSND_PCM_FORMAT_IEC958_SUBFRAME_BE, SND_PCM_FORMAT_IEC958_SUBFRAME_BE },
-	{XENSND_PCM_FORMAT_IMA_ADPCM,          SND_PCM_FORMAT_IMA_ADPCM },
-	{XENSND_PCM_FORMAT_MPEG,               SND_PCM_FORMAT_MPEG },
-	{XENSND_PCM_FORMAT_GSM,                SND_PCM_FORMAT_GSM },
-};
+using SoundItf::PcmParams;
+using SoundItf::SoundException;
+using SoundItf::StreamType;
 
 unordered_map<int, CommandHandler::CommandFn> CommandHandler::sCmdTable =
 {
@@ -72,11 +44,11 @@ unordered_map<int, CommandHandler::CommandFn> CommandHandler::sCmdTable =
 	{XENSND_OP_WRITE,	&CommandHandler::write}
 };
 
-/***************************************************************************//**
+/*******************************************************************************
  * CommandHandler
  ******************************************************************************/
 
-CommandHandler::CommandHandler(Alsa::StreamType type, int domId) :
+CommandHandler::CommandHandler(StreamType type, int domId) :
 	mDomId(domId),
 	mAlsaPcm(type),
 	mLog("CommandHandler")
@@ -89,7 +61,7 @@ CommandHandler::~CommandHandler()
 	LOG(mLog, DEBUG) << "Delete command handler, dom: " << mDomId;
 }
 
-/***************************************************************************//**
+/*******************************************************************************
  * Public
  ******************************************************************************/
 
@@ -107,7 +79,7 @@ int CommandHandler::processCommand(const xensnd_req& req)
 
 		status = XEN_EINVAL;
 	}
-	catch(const AlsaPcmException& e)
+	catch(const SoundException& e)
 	{
 		LOG(mLog, ERROR) << e.what();
 
@@ -119,7 +91,7 @@ int CommandHandler::processCommand(const xensnd_req& req)
 	return status;
 }
 
-/***************************************************************************//**
+/*******************************************************************************
  * Private
  ******************************************************************************/
 
@@ -136,8 +108,8 @@ void CommandHandler::open(const xensnd_req& req)
 	mBuffer.reset(new XenGnttabBuffer(mDomId, refs.data(), refs.size(),
 									  PROT_READ | PROT_WRITE));
 
-	mAlsaPcm.open(AlsaPcmParams(convertPcmFormat(openReq.pcm_format),
-								openReq.pcm_rate, openReq.pcm_channels));
+	mAlsaPcm.open(PcmParams(openReq.pcm_format, openReq.pcm_rate,
+							openReq.pcm_channels));
 }
 
 void CommandHandler::close(const xensnd_req& req)
@@ -205,17 +177,4 @@ void CommandHandler::getBufferRefs(grant_ref_t startDirectory, uint32_t size,
 	}
 
 	DLOG(mLog, DEBUG) << "Get buffer refs, num refs: " << refs.size();
-}
-
-snd_pcm_format_t CommandHandler::convertPcmFormat(uint8_t format)
-{
-	for (auto value : sPcmFormat)
-	{
-		if (value.sndif == format)
-		{
-			return value.alsa;
-		}
-	}
-
-	throw AlsaPcmException("Can't convert format", XEN_EINVAL);
 }

@@ -29,9 +29,9 @@
 #include <xen/be/XenGnttab.hpp>
 #include <xen/be/Log.hpp>
 
-#include "AlsaPcm.hpp"
-
 #include <xen/io/sndif.h>
+
+#include "AlsaPcm.hpp"
 
 /**
  * Handles commands received from the frontend.
@@ -44,7 +44,7 @@ public:
 	 * @param type  Alsa stream type
 	 * @param domId domain id
 	 */
-	CommandHandler(Alsa::StreamType type, int domId);
+	CommandHandler(SoundItf::StreamType type, int domId);
 	~CommandHandler();
 
 	/**
@@ -55,13 +55,6 @@ public:
 	int processCommand(const xensnd_req& req);
 
 private:
-	struct PcmFormat
-	{
-		uint8_t sndif;
-		snd_pcm_format_t alsa;
-	};
-
-	static PcmFormat sPcmFormat[];
 
 	typedef void(CommandHandler::*CommandFn)(const xensnd_req& req);
 
@@ -80,7 +73,6 @@ private:
 	void write(const xensnd_req& req);
 
 	void getBufferRefs(grant_ref_t startDirectory, uint32_t size, std::vector<grant_ref_t>& refs);
-	snd_pcm_format_t convertPcmFormat(uint8_t format);
 };
 
 #endif /* SRC_COMMANDHANDLER_HPP_ */
