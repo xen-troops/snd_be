@@ -31,7 +31,7 @@
 
 #include <xen/io/sndif.h>
 
-#include "AlsaPcm.hpp"
+#include "SoundItf.hpp"
 
 /**
  * Handles commands received from the frontend.
@@ -40,11 +40,13 @@
 class CommandHandler
 {
 public:
+
 	/**
 	 * @param type  Alsa stream type
 	 * @param domId domain id
 	 */
-	CommandHandler(SoundItf::StreamType type, int domId);
+	CommandHandler(SoundItf::PcmType pcmType, SoundItf::StreamType type,
+				   int domId);
 	~CommandHandler();
 
 	/**
@@ -62,8 +64,7 @@ private:
 
 	int mDomId;
 	std::unique_ptr<XenBackend::XenGnttabBuffer> mBuffer;
-
-	Alsa::AlsaPcm mAlsaPcm;
+	std::unique_ptr<SoundItf::PcmDevice> mPcmDevice;
 
 	XenBackend::Log mLog;
 

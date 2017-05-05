@@ -54,22 +54,23 @@ using XenBackend::RingBufferInBase;
 using XenBackend::XenStore;
 
 using SoundItf::StreamType;
+using SoundItf::PcmType;
 
 /*******************************************************************************
  * StreamRingBuffer
  ******************************************************************************/
 
-StreamRingBuffer::StreamRingBuffer(int id, SoundItf::StreamType type,
-								   domid_t domId,
+StreamRingBuffer::StreamRingBuffer(int id, PcmType pcmType,
+								   StreamType streamType, domid_t domId,
 								   evtchn_port_t port, grant_ref_t ref) :
 	RingBufferInBase<xen_sndif_back_ring, xen_sndif_sring,
 					 xensnd_req, xensnd_resp>(domId, port, ref),
 	mId(id),
-	mCommandHandler(type, domId),
+	mCommandHandler(pcmType, streamType, domId),
 	mLog("StreamRing(" + to_string(id) + ")")
 {
 	LOG(mLog, DEBUG) << "Create stream ring buffer: id = " << id
-					 << ", type:" << static_cast<int>(type);
+					 << ", type:" << static_cast<int>(streamType);
 }
 
 void StreamRingBuffer::processRequest(const xensnd_req& req)
@@ -158,7 +159,7 @@ void SndFrontendHandler::createStream(int id, StreamType type,
 					 << ", dom: " << getDomId();
 
 	RingBufferPtr ringBuffer(
-			new StreamRingBuffer(id, type, getDomId(), port, ref));
+			new StreamRingBuffer(id, mPcmType, type, getDomId(), port, ref));
 
 	addRingBuffer(ringBuffer);
 }
@@ -170,7 +171,7 @@ void SndFrontendHandler::createStream(int id, StreamType type,
 void SndBackend::onNewFrontend(domid_t domId, uint16_t devId)
 {
 	addFrontendHandler(FrontendHandlerPtr(new SndFrontendHandler(
-			getDeviceName(), getDomId(), domId, devId)));
+			mPcmType, getDeviceName(), getDomId(), domId, devId)));
 }
 
 /*******************************************************************************
@@ -246,7 +247,7 @@ int main(int argc, char *argv[])
 
 		if (commandLineOptions(argc, argv))
 		{
-			SndBackend sndBackend("SndBackend", XENSND_DRIVER_NAME, 0);
+			SndBackend sndBackend(PcmType::ALSA, XENSND_DRIVER_NAME, 0);
 
 			sndBackend.start();
 

@@ -4,8 +4,9 @@ project(snd_be)
 
 set(SOURCES
 	src/AlsaPcm.cpp
-	src/SndBackend.cpp
 	src/CommandHandler.cpp
+	src/PulsePcm.cpp
+	src/SndBackend.cpp
 )
 
 include_directories(
@@ -21,7 +22,7 @@ link_directories(${XEN_LIB_PATH} ${XENBE_LIB_PATH})
 
 add_executable(snd_be ${SOURCES})
 
-target_link_libraries(snd_be xenbe xenctrl xenstore xenevtchn xengnttab asound pthread)
+target_link_libraries(snd_be xenbe xenctrl xenstore xenevtchn xengnttab asound pulse-simple pulse pthread)
 
 find_package(Doxygen)
 if(DOXYGEN_FOUND)

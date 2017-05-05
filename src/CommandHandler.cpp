@@ -24,6 +24,9 @@
 
 #include <xen/errno.h>
 
+#include "AlsaPcm.hpp"
+#include "PulsePcm.hpp"
+
 using std::min;
 using std::out_of_range;
 using std::vector;
@@ -33,6 +36,7 @@ using XenBackend::XenException;
 using XenBackend::XenGnttabBuffer;
 
 using SoundItf::PcmParams;
+using SoundItf::PcmType;
 using SoundItf::SoundException;
 using SoundItf::StreamType;
 
@@ -48,12 +52,26 @@ unordered_map<int, CommandHandler::CommandFn> CommandHandler::sCmdTable =
  * CommandHandler
  ******************************************************************************/
 
-CommandHandler::CommandHandler(StreamType type, int domId) :
+CommandHandler::CommandHandler(PcmType pcmType, StreamType type, int domId) :
 	mDomId(domId),
-	mAlsaPcm(type),
 	mLog("CommandHandler")
 {
 	LOG(mLog, DEBUG) << "Create command handler, dom: " << mDomId;
+
+	if (pcmType == PcmType::ALSA)
+	{
+		mPcmDevice.reset(new Alsa::AlsaPcm(type));
+	}
+
+	if (pcmType == PcmType::PULSE)
+	{
+		mPcmDevice.reset(new Pulse::PulsePcm(type, ""));
+	}
+
+	if (!mPcmDevice)
+	{
+		throw SoundException("Invalid PCM type", XEN_EINVAL);
+	}
 }
 
 CommandHandler::~CommandHandler()
@@ -108,8 +126,8 @@ void CommandHandler::open(const xensnd_req& req)
 	mBuffer.reset(new XenGnttabBuffer(mDomId, refs.data(), refs.size(),
 									  PROT_READ | PROT_WRITE));
 
-	mAlsaPcm.open(PcmParams(openReq.pcm_format, openReq.pcm_rate,
-							openReq.pcm_channels));
+	mPcmDevice->open(PcmParams(openReq.pcm_rate, openReq.pcm_format,
+							   openReq.pcm_channels));
 }
 
 void CommandHandler::close(const xensnd_req& req)
@@ -118,7 +136,7 @@ void CommandHandler::close(const xensnd_req& req)
 
 	mBuffer.reset();
 
-	mAlsaPcm.close();
+	mPcmDevice->close();
 }
 
 void CommandHandler::read(const xensnd_req& req)
@@ -127,8 +145,8 @@ void CommandHandler::read(const xensnd_req& req)
 
 	const xensnd_rw_req& readReq = req.op.rw;
 
-	mAlsaPcm.read(&(static_cast<uint8_t*>(mBuffer->get())[readReq.offset]),
-				  readReq.length);
+	mPcmDevice->read(&(static_cast<uint8_t*>(mBuffer->get())[readReq.offset]),
+					 readReq.length);
 }
 
 void CommandHandler::write(const xensnd_req& req)
@@ -137,8 +155,8 @@ void CommandHandler::write(const xensnd_req& req)
 
 	const xensnd_rw_req& writeReq = req.op.rw;
 
-	mAlsaPcm.write(&(static_cast<uint8_t*>(mBuffer->get())[writeReq.offset]),
-				   writeReq.length);
+	mPcmDevice->write(&(static_cast<uint8_t*>(mBuffer->get())[writeReq.offset]),
+					  writeReq.length);
 }
 
 void CommandHandler::getBufferRefs(grant_ref_t startDirectory, uint32_t size,

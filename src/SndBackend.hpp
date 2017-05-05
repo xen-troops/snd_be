@@ -51,7 +51,8 @@ public:
 	 * @param port  event channel port number
 	 * @param ref   grant table reference
 	 */
-	StreamRingBuffer(int id, SoundItf::StreamType type, domid_t domId,
+	StreamRingBuffer(int id, SoundItf::PcmType pcmType,
+					 SoundItf::StreamType streamType, domid_t domId,
 					 evtchn_port_t port, grant_ref_t ref);
 
 private:
@@ -75,9 +76,10 @@ public:
 	 * @param backend backend instance
 	 * @param id      frontend instance id
 	 */
-	SndFrontendHandler(const std::string devName,
+	SndFrontendHandler(SoundItf::PcmType pcmType, const std::string devName,
 					   domid_t beDomId, domid_t feDomId, uint16_t devId) :
 		FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId, devId),
+		mPcmType(pcmType),
 		mLog("SndFrontend") {}
 
 protected:
@@ -96,6 +98,8 @@ private:
 
 	XenBackend::Log mLog;
 
+	SoundItf::PcmType mPcmType;
+
 	void createStream(int id, SoundItf::StreamType type,
 					  const std::string& streamPath);
 	void processCard(const std::string& cardPath);
@@ -109,7 +113,11 @@ private:
  ******************************************************************************/
 class SndBackend : public XenBackend::BackendBase
 {
-	using XenBackend::BackendBase::BackendBase;
+public:
+
+	SndBackend(SoundItf::PcmType pcmType, const std::string& deviceName,
+			   domid_t domId) : BackendBase("SndBackend", deviceName, domId),
+		mPcmType(pcmType) {}
 
 protected:
 
@@ -118,7 +126,11 @@ protected:
 	 * @param domId domain id
 	 * @param devId device id
 	 */
-	void onNewFrontend(domid_t domId, uint16_t devId);
+	void onNewFrontend(domid_t domId, uint16_t devId) override;
+
+private:
+
+	SoundItf::PcmType mPcmType;
 };
 
 #endif /* SRC_SNDBACKEND_HPP_ */
