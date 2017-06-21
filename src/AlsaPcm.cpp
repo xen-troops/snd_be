@@ -73,57 +73,57 @@ void AlsaPcm::open(const PcmParams& params)
 
 		int ret = 0;
 
-		if (ret = snd_pcm_open(&mHandle, mDeviceName.c_str(),
-							   streamType, 0) < 0)
+		if ((ret = snd_pcm_open(&mHandle, mDeviceName.c_str(),
+							    streamType, 0)) < 0)
 		{
 			throw SoundException("Can't open audio device " + mDeviceName,
 								 -ret);
 		}
 
-		if (ret = snd_pcm_hw_params_malloc(&hwParams) < 0)
+		if ((ret = snd_pcm_hw_params_malloc(&hwParams)) < 0)
 		{
 			throw SoundException("Can't allocate hw params " + mDeviceName,
 								 -ret);
 		}
 
-		if (ret = snd_pcm_hw_params_any(mHandle, hwParams) < 0)
+		if ((ret = snd_pcm_hw_params_any(mHandle, hwParams)) < 0)
 		{
 			throw SoundException("Can't allocate hw params " + mDeviceName,
 								 -ret);
 		}
 
-		if (ret = snd_pcm_hw_params_set_access(mHandle, hwParams,
-				SND_PCM_ACCESS_RW_INTERLEAVED) < 0)
+		if ((ret = snd_pcm_hw_params_set_access(mHandle, hwParams,
+				SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
 		{
 			throw SoundException("Can't set access " + mDeviceName, -ret);
 		}
 
-		if (ret = snd_pcm_hw_params_set_format(mHandle, hwParams,
-				convertPcmFormat(params.format)) < 0)
+		if ((ret = snd_pcm_hw_params_set_format(mHandle, hwParams,
+				convertPcmFormat(params.format))) < 0)
 		{
 			throw SoundException("Can't set format " + mDeviceName, -ret);
 		}
 
 		unsigned int rate = params.rate;
 
-		if (ret = snd_pcm_hw_params_set_rate_near(mHandle, hwParams,
-												  &rate, 0) < 0)
+		if ((ret = snd_pcm_hw_params_set_rate_near(mHandle, hwParams,
+												   &rate, 0)) < 0)
 		{
 			throw SoundException("Can't set rate " + mDeviceName, -ret);
 		}
 
-		if (ret = snd_pcm_hw_params_set_channels(mHandle, hwParams,
-												 params.numChannels) < 0)
+		if ((ret = snd_pcm_hw_params_set_channels(mHandle, hwParams,
+												  params.numChannels)) < 0)
 		{
 			throw SoundException("Can't set channels " + mDeviceName, -ret);
 		}
 
-		if (ret = snd_pcm_hw_params(mHandle, hwParams) < 0)
+		if ((ret = snd_pcm_hw_params(mHandle, hwParams)) < 0)
 		{
 			throw SoundException("Can't set hwParams " + mDeviceName, -ret);
 		}
 
-		if (ret = snd_pcm_prepare(mHandle) < 0)
+		if ((ret = snd_pcm_prepare(mHandle)) < 0)
 		{
 			throw SoundException(
 					"Can't prepare audio interface for use", -ret);

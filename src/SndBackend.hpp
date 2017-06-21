@@ -96,9 +96,9 @@ protected:
 
 private:
 
-	XenBackend::Log mLog;
-
 	SoundItf::PcmType mPcmType;
+
+	XenBackend::Log mLog;
 
 	void createStream(int id, SoundItf::StreamType type,
 					  const std::string& streamPath);
