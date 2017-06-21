@@ -83,7 +83,7 @@ private:
 
 	static PcmFormat sPcmFormat[];
 
-	pa_simple *mSimple;
+	pa_simple* mSimple;
 	SoundItf::StreamType mType;
 	std::string mStreamName;
 	XenBackend::Log mLog;

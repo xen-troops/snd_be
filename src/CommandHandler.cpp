@@ -24,8 +24,13 @@
 
 #include <xen/errno.h>
 
+#ifdef WITH_ALSA
 #include "AlsaPcm.hpp"
+#endif
+
+#ifdef WITH_PULSE
 #include "PulsePcm.hpp"
+#endif
 
 using std::min;
 using std::out_of_range;
@@ -60,12 +65,20 @@ CommandHandler::CommandHandler(PcmType pcmType, StreamType type, int domId) :
 
 	if (pcmType == PcmType::ALSA)
 	{
+#ifdef WITH_ALSA
 		mPcmDevice.reset(new Alsa::AlsaPcm(type));
+#else
+		throw SoundException("Alsa PCM is not supported", XEN_EINVAL);
+#endif
 	}
 
 	if (pcmType == PcmType::PULSE)
 	{
+#ifdef WITH_PCM
 		mPcmDevice.reset(new Pulse::PulsePcm(type, ""));
+#else
+		throw SoundException("Pulse PCM is not supported", XEN_EINVAL);
+#endif
 	}
 
 	if (!mPcmDevice)
