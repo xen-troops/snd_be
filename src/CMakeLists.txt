@@ -17,7 +17,7 @@ if(WITH_ALSA)
 endif()
 
 if(WITH_PULSE)
-	pkg_check_modules (PULSE REQUIRED libpulse-simple)
+	pkg_check_modules (PULSE REQUIRED libpulse)
 	if(!PULSE_FOUND)
 		message(FATAL_ERROR "No pulse found")
 	endif()

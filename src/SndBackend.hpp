@@ -28,6 +28,14 @@
 
 #include "CommandHandler.hpp"
 
+#ifdef WITH_ALSA
+#include "AlsaPcm.hpp"
+#endif
+
+#ifdef WITH_PULSE
+#include "PulsePcm.hpp"
+#endif
+
 /***************************************************************************//**
  * @defgroup snd_be
  * Backend related classes.
@@ -51,7 +59,7 @@ public:
 	 * @param port  event channel port number
 	 * @param ref   grant table reference
 	 */
-	StreamRingBuffer(int id, SoundItf::PcmType pcmType,
+	StreamRingBuffer(int id, std::shared_ptr<SoundItf::PcmDevice> pcmDevice,
 					 SoundItf::StreamType streamType, domid_t domId,
 					 evtchn_port_t port, grant_ref_t ref);
 
@@ -79,6 +87,9 @@ public:
 	SndFrontendHandler(SoundItf::PcmType pcmType, const std::string devName,
 					   domid_t beDomId, domid_t feDomId, uint16_t devId) :
 		FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId, devId),
+#ifdef WITH_PULSE
+		mPulseMainloop(getDomName()),
+#endif
 		mPcmType(pcmType),
 		mLog("SndFrontend") {}
 
@@ -96,10 +107,16 @@ protected:
 
 private:
 
+#ifdef WITH_PULSE
+	Pulse::PulseMainloop mPulseMainloop;
+#endif
+
 	SoundItf::PcmType mPcmType;
 
 	XenBackend::Log mLog;
 
+	std::shared_ptr<SoundItf::PcmDevice> createPcmDevice(
+			SoundItf::StreamType type, int id);
 	void createStream(int id, SoundItf::StreamType type,
 					  const std::string& streamPath);
 	void processCard(const std::string& cardPath);
@@ -117,7 +134,8 @@ public:
 
 	SndBackend(SoundItf::PcmType pcmType, const std::string& deviceName,
 			   domid_t domId) : BackendBase("SndBackend", deviceName, domId),
-		mPcmType(pcmType) {}
+		mPcmType(pcmType)
+	{}
 
 protected:
 

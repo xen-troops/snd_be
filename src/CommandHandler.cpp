@@ -34,14 +34,15 @@
 
 using std::min;
 using std::out_of_range;
+using std::shared_ptr;
 using std::vector;
 using std::unordered_map;
 
 using XenBackend::XenException;
 using XenBackend::XenGnttabBuffer;
 
+using SoundItf::PcmDevice;
 using SoundItf::PcmParams;
-using SoundItf::PcmType;
 using SoundItf::SoundException;
 using SoundItf::StreamType;
 
@@ -57,34 +58,13 @@ unordered_map<int, CommandHandler::CommandFn> CommandHandler::sCmdTable =
  * CommandHandler
  ******************************************************************************/
 
-CommandHandler::CommandHandler(PcmType pcmType, StreamType type, int domId) :
+CommandHandler::CommandHandler(shared_ptr<PcmDevice> pcmDevice,
+							   StreamType type, int domId) :
+	mPcmDevice(pcmDevice),
 	mDomId(domId),
 	mLog("CommandHandler")
 {
 	LOG(mLog, DEBUG) << "Create command handler, dom: " << mDomId;
-
-	if (pcmType == PcmType::ALSA)
-	{
-#ifdef WITH_ALSA
-		mPcmDevice.reset(new Alsa::AlsaPcm(type));
-#else
-		throw SoundException("Alsa PCM is not supported", XEN_EINVAL);
-#endif
-	}
-
-	if (pcmType == PcmType::PULSE)
-	{
-#ifdef WITH_PCM
-		mPcmDevice.reset(new Pulse::PulsePcm(type, ""));
-#else
-		throw SoundException("Pulse PCM is not supported", XEN_EINVAL);
-#endif
-	}
-
-	if (!mPcmDevice)
-	{
-		throw SoundException("Invalid PCM type", XEN_EINVAL);
-	}
 }
 
 CommandHandler::~CommandHandler()

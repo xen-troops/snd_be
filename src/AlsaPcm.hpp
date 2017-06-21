@@ -65,14 +65,14 @@ public:
 	 * @param buffer buffer where to put data
 	 * @param size   number of bytes to read
 	 */
-	void read(uint8_t* buffer, ssize_t size) override;
+	void read(uint8_t* buffer, size_t size) override;
 
 	/**
 	 * Writes data to the pcm device.
 	 * @param buffer buffer with data
 	 * @param size   number of bytes to write
 	 */
-	void write(uint8_t* buffer, ssize_t size) override;
+	void write(uint8_t* buffer, size_t size) override;
 
 private:
 

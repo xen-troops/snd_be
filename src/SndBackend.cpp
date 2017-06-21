@@ -28,6 +28,7 @@
 #include <execinfo.h>
 #include <getopt.h>
 
+#include <xen/errno.h>
 #include <xen/be/XenStore.hpp>
 
 /***************************************************************************//**
@@ -42,31 +43,35 @@ using std::cout;
 using std::endl;
 using std::exception;
 using std::signal;
+using std::shared_ptr;
 using std::string;
 using std::to_string;
 using std::unique_ptr;
 using std::vector;
 
+using XenBackend::FrontendHandlerException;
 using XenBackend::FrontendHandlerPtr;
 using XenBackend::Log;
 using XenBackend::RingBufferPtr;
 using XenBackend::RingBufferInBase;
 using XenBackend::XenStore;
 
+using SoundItf::SoundException;
 using SoundItf::StreamType;
+using SoundItf::PcmDevice;
 using SoundItf::PcmType;
 
 /*******************************************************************************
  * StreamRingBuffer
  ******************************************************************************/
 
-StreamRingBuffer::StreamRingBuffer(int id, PcmType pcmType,
+StreamRingBuffer::StreamRingBuffer(int id, shared_ptr<PcmDevice> pcmDevice,
 								   StreamType streamType, domid_t domId,
 								   evtchn_port_t port, grant_ref_t ref) :
 	RingBufferInBase<xen_sndif_back_ring, xen_sndif_sring,
 					 xensnd_req, xensnd_resp>(domId, port, ref),
 	mId(id),
-	mCommandHandler(pcmType, streamType, domId),
+	mCommandHandler(pcmDevice, streamType, domId),
 	mLog("StreamRing(" + to_string(id) + ")")
 {
 	LOG(mLog, DEBUG) << "Create stream ring buffer: id = " << id
@@ -158,10 +163,43 @@ void SndFrontendHandler::createStream(int id, StreamType type,
 	LOG(mLog, DEBUG) << "Read ring buffer ref: " << ref
 					 << ", dom: " << getDomId();
 
+	auto pcmDevice = createPcmDevice(type, id);
+
 	RingBufferPtr ringBuffer(
-			new StreamRingBuffer(id, mPcmType, type, getDomId(), port, ref));
+			new StreamRingBuffer(id, pcmDevice, type, getDomId(), port, ref));
 
 	addRingBuffer(ringBuffer);
+}
+
+shared_ptr<PcmDevice> SndFrontendHandler::createPcmDevice(StreamType type,
+														  int id)
+{
+	shared_ptr<PcmDevice> pcmDevice;
+
+	if (mPcmType == PcmType::ALSA)
+	{
+#ifdef WITH_ALSA
+		pcmDevice.reset(new Alsa::AlsaPcm(type));
+#else
+		throw FrontendHandlerException("Alsa PCM is not supported");
+#endif
+	}
+
+	if (mPcmType == PcmType::PULSE)
+	{
+#ifdef WITH_PULSE
+		pcmDevice.reset(mPulseMainloop.createStream(type, to_string(id)));
+#else
+		throw FrontendHandlerException("Pulse PCM is not supported");
+#endif
+	}
+
+	if (!pcmDevice)
+	{
+		throw FrontendHandlerException("Invalid PCM type");
+	}
+
+	return pcmDevice;
 }
 
 /*******************************************************************************

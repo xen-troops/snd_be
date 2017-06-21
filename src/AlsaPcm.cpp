@@ -155,7 +155,7 @@ void AlsaPcm::close()
 	mHandle = nullptr;
 }
 
-void AlsaPcm::read(uint8_t* buffer, ssize_t size)
+void AlsaPcm::read(uint8_t* buffer, size_t size)
 {
 	DLOG(mLog, DEBUG) << "Read from pcm device: " << mDeviceName
 					  << ", size: " << size;
@@ -188,7 +188,7 @@ void AlsaPcm::read(uint8_t* buffer, ssize_t size)
 	}
 }
 
-void AlsaPcm::write(uint8_t* buffer, ssize_t size)
+void AlsaPcm::write(uint8_t* buffer, size_t size)
 {
 	DLOG(mLog, DEBUG) << "Write to pcm device: " << mDeviceName
 					  << ", size: " << size;

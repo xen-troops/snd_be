@@ -117,14 +117,14 @@ public:
 	 * @param buffer buffer where to put data
 	 * @param size   number of bytes to read
 	 */
-	virtual void read(uint8_t* buffer, ssize_t size) = 0;
+	virtual void read(uint8_t* buffer, size_t size) = 0;
 
 	/**
 	 * Writes data to the device.
 	 * @param buffer buffer with data
 	 * @param size   number of bytes to write
 	 */
-	virtual void write(uint8_t* buffer, ssize_t size) = 0;
+	virtual void write(uint8_t* buffer, size_t size) = 0;
 };
 
 }

@@ -21,6 +21,7 @@
 #ifndef SRC_PULSEPCM_HPP_
 #define SRC_PULSEPCM_HPP_
 
+#include <pulse/pulseaudio.h>
 #include <pulse/simple.h>
 
 #include <xen/be/Log.hpp>
@@ -29,10 +30,88 @@
 
 namespace Pulse {
 
+class PulsePcm;
+
 /***************************************************************************//**
  * @defgroup pulse
  * PulseAudio related classes.
  ******************************************************************************/
+
+/***************************************************************************//**
+ * Wrapper for main loop lock
+ * @ingroup pulse
+ ******************************************************************************/
+class PulseMutex
+{
+public:
+
+	PulseMutex(pa_threaded_mainloop* mainloop) : mMainloop(mainloop) {}
+	void lock() { pa_threaded_mainloop_lock(mMainloop); }
+	void unlock() { pa_threaded_mainloop_unlock(mMainloop); }
+
+private:
+
+	pa_threaded_mainloop* mMainloop;
+};
+
+/***************************************************************************//**
+ * Wrapper for Pulse prop list
+ * @ingroup pulse
+ ******************************************************************************/
+class PulseProplist
+{
+public:
+
+	PulseProplist() { mProplist = pa_proplist_new(); }
+
+	PulseProplist(const std::string& name, const std::string& value) : PulseProplist()
+    {
+        set(name, value);
+    }
+
+	~PulseProplist() { pa_proplist_free(mProplist); }
+
+    int set(const std::string& name, const std::string& value)
+    {
+        return pa_proplist_sets(mProplist, name.c_str(), value.c_str());
+    }
+
+    pa_proplist* operator&() { return mProplist; }
+
+private:
+    pa_proplist* mProplist;
+};
+
+/***************************************************************************//**
+ * PulseAudio main loop
+ * @ingroup pulse
+ ******************************************************************************/
+class PulseMainloop
+{
+public:
+
+	PulseMainloop(const std::string& name);
+	~PulseMainloop();
+
+	PulsePcm* createStream(SoundItf::StreamType type, const std::string& name,
+						   const std::string& propName = "",
+						   const std::string& propValue = "");
+
+private:
+
+	pa_threaded_mainloop* mMainloop;
+	pa_context* mContext;
+	PulseMutex mMutex;
+
+	XenBackend::Log mLog;
+
+	static void sContextStateChanged(pa_context *context, void *data);
+	void contextStateChanged();
+
+	void waitContextReady();
+	void init(const std::string& name);
+	void release();
+};
 
 /***************************************************************************//**
  * Provides PulseAudio pcm functionality.
@@ -45,7 +124,12 @@ public:
 	 * @param type stream type
 	 * @param name pcm device name
 	 */
-	PulsePcm(SoundItf::StreamType type, const std::string& streamName);
+	PulsePcm(pa_threaded_mainloop* mainloop, pa_context* context,
+			 SoundItf::StreamType type,
+			 const std::string& name,
+			 const std::string& propName,
+			 const std::string& propValue);
+
 	~PulsePcm();
 
 	/**
@@ -64,14 +148,14 @@ public:
 	 * @param buffer buffer where to put data
 	 * @param size   number of bytes to read
 	 */
-	void read(uint8_t* buffer, ssize_t size) override;
+	void read(uint8_t* buffer, size_t size) override;
 
 	/**
 	 * Writes data to the pcm device.
 	 * @param buffer buffer with data
 	 * @param size   number of bytes to write
 	 */
-	void write(uint8_t* buffer, ssize_t size) override;
+	void write(uint8_t* buffer, size_t size) override;
 
 private:
 
@@ -83,10 +167,36 @@ private:
 
 	static PcmFormat sPcmFormat[];
 
-	pa_simple* mSimple;
+	pa_threaded_mainloop* mMainloop;
+	pa_context*  mContext;
+	pa_stream* mStream;
+	int mSuccess;
+	PulseMutex mMutex;
 	SoundItf::StreamType mType;
-	std::string mStreamName;
+	std::string mName;
+	std::string mPropName;
+	std::string mPropValue;
+	const void* mReadData;
+	size_t mReadIndex;
+	size_t mReadLength;
+
 	XenBackend::Log mLog;
+
+	static void sStreamStateChanged(pa_stream *stream, void *data);
+	static void sStreamRequest(pa_stream *stream, size_t nbytes, void *data);
+	static void sLatencyUpdate(pa_stream *stream, void *data);
+	static void sSuccessCbk(pa_stream* stream, int success, void *data);
+
+	void streamStateChanged();
+	void streamRequest(size_t nbytes);
+	void latencyUpdate();
+	void successCbk(int success);
+
+	void waitStreamReady();
+	void drain();
+	int waitOperationFinished(pa_operation* op);
+	int getStatus();
+	void checkStatus();
 
 	pa_sample_format_t convertPcmFormat(uint8_t format);
 };
