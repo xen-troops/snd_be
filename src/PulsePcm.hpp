@@ -95,7 +95,8 @@ public:
 
 	PulsePcm* createStream(SoundItf::StreamType type, const std::string& name,
 						   const std::string& propName = "",
-						   const std::string& propValue = "");
+						   const std::string& propValue = "",
+						   const std::string& deviceValue = "");
 
 private:
 
@@ -128,7 +129,8 @@ public:
 			 SoundItf::StreamType type,
 			 const std::string& name,
 			 const std::string& propName,
-			 const std::string& propValue);
+			 const std::string& propValue,
+			 const std::string& deviceName = "");
 
 	~PulsePcm();
 
@@ -176,6 +178,7 @@ private:
 	std::string mName;
 	std::string mPropName;
 	std::string mPropValue;
+	std::string mDeviceName;
 	const void* mReadData;
 	size_t mReadIndex;
 	size_t mReadLength;

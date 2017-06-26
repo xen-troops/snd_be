@@ -76,9 +76,11 @@ PulseMainloop::~PulseMainloop()
 
 PulsePcm* PulseMainloop::createStream(StreamType type, const string& name,
 									  const string& propName,
-									  const string& propValue)
+									  const string& propValue,
+									  const string& deviceName)
 {
-	return new PulsePcm(mMainloop, mContext, type, name, propName, propValue);
+	return new PulsePcm(mMainloop, mContext, type, name,
+						propName, propValue, deviceName);
 }
 
 /*******************************************************************************
@@ -196,7 +198,8 @@ void PulseMainloop::release()
 
 PulsePcm::PulsePcm(pa_threaded_mainloop* mainloop, pa_context* context,
 				   StreamType type, const string& name,
-				   const string& propName, const string& propValue) :
+				   const string& propName, const string& propValue,
+				   const string& deviceName) :
 	mMainloop(mainloop),
 	mContext(context),
 	mStream(nullptr),
@@ -206,9 +209,10 @@ PulsePcm::PulsePcm(pa_threaded_mainloop* mainloop, pa_context* context,
 	mName(name),
 	mPropName(propName),
 	mPropValue(propValue),
-    mReadData(nullptr),
-    mReadIndex(0),
-    mReadLength(0),
+	mDeviceName(deviceName),
+	mReadData(nullptr),
+	mReadIndex(0),
+	mReadLength(0),
 	mLog("PulsePcm")
 {
 	LOG(mLog, DEBUG) << "Create pcm device: " << mName;
@@ -261,6 +265,13 @@ void PulsePcm::open(const PcmParams& params)
 
 	pa_stream_set_state_callback(mStream, sStreamStateChanged, this);
 
+	const char* deviceName = nullptr;
+
+	if (!mDeviceName.empty())
+	{
+		deviceName = mDeviceName.c_str();
+	}
+
 	int ret = 0;
 
 	if (streamType == PA_STREAM_PLAYBACK)
@@ -268,7 +279,7 @@ void PulsePcm::open(const PcmParams& params)
 		pa_stream_set_write_callback(mStream, sStreamRequest, this);
 		pa_stream_set_latency_update_callback(mStream, sLatencyUpdate, this);
 
-		ret = pa_stream_connect_playback(mStream, nullptr, nullptr,
+		ret = pa_stream_connect_playback(mStream, deviceName, nullptr,
 										 static_cast<pa_stream_flags_t>(
 										 PA_STREAM_INTERPOLATE_TIMING |
 										 PA_STREAM_ADJUST_LATENCY |
@@ -279,7 +290,7 @@ void PulsePcm::open(const PcmParams& params)
 	{
 	    pa_stream_set_read_callback(mStream, sStreamRequest, this);
 
-		ret = pa_stream_connect_record(mStream, nullptr, nullptr,
+		ret = pa_stream_connect_record(mStream, deviceName, nullptr,
 									   static_cast<pa_stream_flags_t>(
 									   PA_STREAM_INTERPOLATE_TIMING |
 									   PA_STREAM_ADJUST_LATENCY |
