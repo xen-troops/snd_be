@@ -61,6 +61,9 @@ using SoundItf::StreamType;
 using SoundItf::PcmDevice;
 using SoundItf::PcmType;
 
+
+string gCfgFileName;
+
 /*******************************************************************************
  * StreamRingBuffer
  ******************************************************************************/
@@ -176,19 +179,27 @@ shared_ptr<PcmDevice> SndFrontendHandler::createPcmDevice(StreamType type,
 {
 	shared_ptr<PcmDevice> pcmDevice;
 
-	if (mPcmType == PcmType::ALSA)
+	if (mConfig.getPcmType() == PcmType::ALSA)
 	{
 #ifdef WITH_ALSA
-		pcmDevice.reset(new Alsa::AlsaPcm(type));
+		pcmDevice.reset(new Alsa::AlsaPcm(type,
+										  mConfig.getStreamDevice(type, id)));
 #else
 		throw FrontendHandlerException("Alsa PCM is not supported");
 #endif
 	}
 
-	if (mPcmType == PcmType::PULSE)
+	if (mConfig.getPcmType() == PcmType::PULSE)
 	{
 #ifdef WITH_PULSE
-		pcmDevice.reset(mPulseMainloop.createStream(type, to_string(id)));
+		string deviceName = mConfig.getStreamDevice(type, id);
+		string propName;
+		string propValue;
+
+		mConfig.getStreamPropery(type, id, propName, propValue);
+
+		pcmDevice.reset(mPulseMainloop.createStream(type, to_string(id),
+						propName, propValue, deviceName));
 #else
 		throw FrontendHandlerException("Pulse PCM is not supported");
 #endif
@@ -209,7 +220,7 @@ shared_ptr<PcmDevice> SndFrontendHandler::createPcmDevice(StreamType type,
 void SndBackend::onNewFrontend(domid_t domId, uint16_t devId)
 {
 	addFrontendHandler(FrontendHandlerPtr(new SndFrontendHandler(
-			mPcmType, getDeviceName(), getDomId(), domId, devId)));
+			mConfig, getDeviceName(), getDomId(), domId, devId)));
 }
 
 /*******************************************************************************
@@ -253,7 +264,7 @@ bool commandLineOptions(int argc, char *argv[])
 
 	int opt = -1;
 
-	while((opt = getopt(argc, argv, "v:fh?")) != -1)
+	while((opt = getopt(argc, argv, "c:v:fh?")) != -1)
 	{
 		switch(opt)
 		{
@@ -262,6 +273,12 @@ bool commandLineOptions(int argc, char *argv[])
 			{
 				return false;
 			}
+
+			break;
+
+		case 'c':
+
+			gCfgFileName = optarg;
 
 			break;
 
@@ -285,7 +302,9 @@ int main(int argc, char *argv[])
 
 		if (commandLineOptions(argc, argv))
 		{
-			SndBackend sndBackend(PcmType::ALSA, XENSND_DRIVER_NAME, 0);
+			Config config(gCfgFileName);
+
+			SndBackend sndBackend(config, XENSND_DRIVER_NAME, 0);
 
 			sndBackend.start();
 
@@ -298,6 +317,7 @@ int main(int argc, char *argv[])
 			cout << "Usage: " << argv[0] << " [-v <level>]" << endl;
 			cout << "\t-v -- verbose level "
 				 << "(disable, error, warning, info, debug)" << endl;
+			cout << "\t-c -- config file" << endl;
 		}
 	}
 	catch(const exception& e)

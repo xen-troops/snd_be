@@ -33,6 +33,7 @@ endif()
 
 set(SOURCES
 	CommandHandler.cpp
+	Config.cpp
 	SndBackend.cpp
 )
 

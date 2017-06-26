@@ -27,6 +27,7 @@
 #include <xen/be/Log.hpp>
 
 #include "CommandHandler.hpp"
+#include "Config.hpp"
 
 #ifdef WITH_ALSA
 #include "AlsaPcm.hpp"
@@ -84,13 +85,13 @@ public:
 	 * @param backend backend instance
 	 * @param id      frontend instance id
 	 */
-	SndFrontendHandler(SoundItf::PcmType pcmType, const std::string devName,
+	SndFrontendHandler(Config& config, const std::string devName,
 					   domid_t beDomId, domid_t feDomId, uint16_t devId) :
 		FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId, devId),
 #ifdef WITH_PULSE
 		mPulseMainloop(getDomName()),
 #endif
-		mPcmType(pcmType),
+		mConfig(config),
 		mLog("SndFrontend") {}
 
 protected:
@@ -111,7 +112,7 @@ private:
 	Pulse::PulseMainloop mPulseMainloop;
 #endif
 
-	SoundItf::PcmType mPcmType;
+	Config& mConfig;
 
 	XenBackend::Log mLog;
 
@@ -132,9 +133,9 @@ class SndBackend : public XenBackend::BackendBase
 {
 public:
 
-	SndBackend(SoundItf::PcmType pcmType, const std::string& deviceName,
+	SndBackend(Config& config, const std::string& deviceName,
 			   domid_t domId) : BackendBase("SndBackend", deviceName, domId),
-		mPcmType(pcmType)
+		mConfig(config)
 	{}
 
 protected:
@@ -148,7 +149,7 @@ protected:
 
 private:
 
-	SoundItf::PcmType mPcmType;
+	Config& mConfig;
 };
 
 #endif /* SRC_SNDBACKEND_HPP_ */
