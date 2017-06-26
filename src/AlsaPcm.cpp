@@ -42,6 +42,11 @@ AlsaPcm::AlsaPcm(StreamType type, const std::string& deviceName) :
 	mType(type),
 	mLog("AlsaPcm")
 {
+	if (mDeviceName.empty())
+	{
+		mDeviceName = "default";
+	}
+
 	LOG(mLog, DEBUG) << "Create pcm device: " << mDeviceName;
 }
 
