@@ -20,6 +20,7 @@
 
 #include "SndBackend.hpp"
 
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -42,6 +43,7 @@
 using std::cout;
 using std::endl;
 using std::exception;
+using std::ofstream;
 using std::signal;
 using std::shared_ptr;
 using std::string;
@@ -63,6 +65,7 @@ using SoundItf::PcmType;
 
 
 string gCfgFileName;
+string gLogFileName;
 
 /*******************************************************************************
  * StreamRingBuffer
@@ -261,15 +264,15 @@ void waitSignals()
 
 bool commandLineOptions(int argc, char *argv[])
 {
-
 	int opt = -1;
 
-	while((opt = getopt(argc, argv, "c:v:fh?")) != -1)
+	while((opt = getopt(argc, argv, "c:v:l:fh?")) != -1)
 	{
 		switch(opt)
 		{
 		case 'v':
-			if (!Log::setLogLevel(string(optarg)))
+
+			if (!Log::setLogMask(string(optarg)))
 			{
 				return false;
 			}
@@ -282,11 +285,20 @@ bool commandLineOptions(int argc, char *argv[])
 
 			break;
 
+		case 'l':
+
+			gLogFileName = optarg;
+
+			break;
+
 		case 'f':
+
 			Log::setShowFileAndLine(true);
+
 			break;
 
 		default:
+
 			return false;
 		}
 	}
@@ -302,6 +314,14 @@ int main(int argc, char *argv[])
 
 		if (commandLineOptions(argc, argv))
 		{
+			ofstream logFile;
+
+			if (!gLogFileName.empty())
+			{
+				logFile.open(gLogFileName);
+				Log::setStreamBuffer(logFile.rdbuf());
+			}
+
 			Config config(gCfgFileName);
 
 			SndBackend sndBackend(config, XENSND_DRIVER_NAME, 0);
@@ -314,10 +334,15 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			cout << "Usage: " << argv[0] << " [-v <level>]" << endl;
-			cout << "\t-v -- verbose level "
-				 << "(disable, error, warning, info, debug)" << endl;
+			cout << "Usage: " << argv[0]
+				 << " [-c <file>] [-l <file>] [-v <level>]"
+				 << endl;
 			cout << "\t-c -- config file" << endl;
+			cout << "\t-l -- log file" << endl;
+			cout << "\t-v -- verbose level in format: "
+				 << "<module>:<level>;<module:<level>" << endl;
+			cout << "\t      use * for mask selection:"
+				 << " *:Debug,Mod*:Info" << endl;
 		}
 	}
 	catch(const exception& e)
