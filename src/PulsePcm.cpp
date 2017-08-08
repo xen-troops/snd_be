@@ -39,7 +39,7 @@ void contextError(pa_context* context)
 {
 	int error = pa_context_errno(context);
 
-	throw SoundException(pa_strerror(error), error);
+	throw SoundException(string("Pulse error: ") + pa_strerror(error), error);
 }
 
 
@@ -288,7 +288,7 @@ void PulsePcm::open(const PcmParams& params)
 	}
 	else
 	{
-	    pa_stream_set_read_callback(mStream, sStreamRequest, this);
+		pa_stream_set_read_callback(mStream, sStreamRequest, this);
 
 		ret = pa_stream_connect_record(mStream, deviceName, nullptr,
 									   static_cast<pa_stream_flags_t>(

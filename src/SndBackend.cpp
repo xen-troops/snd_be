@@ -63,6 +63,9 @@ using SoundItf::StreamType;
 using SoundItf::PcmDevice;
 using SoundItf::PcmType;
 
+#ifdef WITH_PULSE
+using Pulse::PulseMainloop;
+#endif
 
 string gCfgFileName;
 string gLogFileName;
@@ -101,6 +104,22 @@ void StreamRingBuffer::processRequest(const xensnd_req& req)
 /*******************************************************************************
  * SndFrontendHandler
  ******************************************************************************/
+SndFrontendHandler::SndFrontendHandler(Config& config, const string devName,
+									   domid_t beDomId, domid_t feDomId,
+									   uint16_t devId) :
+	FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId, devId),
+	mConfig(config),
+	mLog("SndFrontend")
+{
+	if (mConfig.getPcmType() == PcmType::PULSE)
+	{
+#ifdef WITH_PULSE
+		mPulseMainloop.reset(new PulseMainloop(getDomName()));
+#else
+		throw FrontendHandlerException("Pulse PCM is not supported");
+#endif
+	}
+}
 
 void SndFrontendHandler::onBind()
 {
@@ -201,7 +220,7 @@ shared_ptr<PcmDevice> SndFrontendHandler::createPcmDevice(StreamType type,
 
 		mConfig.getStreamPropery(type, id, propName, propValue);
 
-		pcmDevice.reset(mPulseMainloop.createStream(type, to_string(id),
+		pcmDevice.reset(mPulseMainloop->createStream(type, to_string(id),
 						propName, propValue, deviceName));
 #else
 		throw FrontendHandlerException("Pulse PCM is not supported");
@@ -331,6 +350,8 @@ int main(int argc, char *argv[])
 			waitSignals();
 
 			sndBackend.stop();
+
+			logFile.close();
 		}
 		else
 		{

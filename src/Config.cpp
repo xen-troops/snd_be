@@ -138,10 +138,16 @@ PcmType Config::readPcmType()
 
 		if (pcmType == "PULSE")
 		{
+#ifndef WITH_PULSE
+			throw ConfigException("Pulse PCM is not supported");
+#endif
 			return PcmType::PULSE;
 		}
 		else if (pcmType == "ALSA")
 		{
+#ifndef WITH_ALSA
+			throw ConfigException("Alsa PCM is not supported");
+#endif
 			return PcmType::ALSA;
 		}
 		else
