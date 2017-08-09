@@ -204,17 +204,20 @@ string Config::readDefaultCapturePropName()
 string Config::readDevice(const string& sectionName, uint32_t id,
 						  const string& defaultValue)
 {
-	Setting& section = mConfig.lookup(sectionName);
-
-	for (int i = 0; i < section.getLength(); i++)
+	if (mConfig.exists(sectionName))
 	{
-		if (static_cast<uint32_t>(section[i].lookup("id")) == id)
-		{
-			string device;
+		Setting& section = mConfig.lookup(sectionName);
 
-			if (section[i].lookupValue("device", device))
+		for (int i = 0; i < section.getLength(); i++)
+		{
+			if (static_cast<uint32_t>(section[i].lookup("id")) == id)
 			{
-				return device;
+				string device;
+
+				if (section[i].lookupValue("device", device))
+				{
+					return device;
+				}
 			}
 		}
 	}
