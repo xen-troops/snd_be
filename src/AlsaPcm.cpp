@@ -20,7 +20,6 @@
 
 #include "AlsaPcm.hpp"
 
-#include <xen/errno.h>
 #include <xen/io/sndif.h>
 
 using std::string;
@@ -81,31 +80,31 @@ void AlsaPcm::open(const PcmParams& params)
 							    streamType, 0)) < 0)
 		{
 			throw SoundException("Can't open audio device " + mDeviceName,
-								 -ret);
+								 ret);
 		}
 
 		if ((ret = snd_pcm_hw_params_malloc(&hwParams)) < 0)
 		{
 			throw SoundException("Can't allocate hw params " + mDeviceName,
-								 -ret);
+								 ret);
 		}
 
 		if ((ret = snd_pcm_hw_params_any(mHandle, hwParams)) < 0)
 		{
 			throw SoundException("Can't allocate hw params " + mDeviceName,
-								 -ret);
+								 ret);
 		}
 
 		if ((ret = snd_pcm_hw_params_set_access(mHandle, hwParams,
 				SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
 		{
-			throw SoundException("Can't set access " + mDeviceName, -ret);
+			throw SoundException("Can't set access " + mDeviceName, ret);
 		}
 
 		if ((ret = snd_pcm_hw_params_set_format(mHandle, hwParams,
 				convertPcmFormat(params.format))) < 0)
 		{
-			throw SoundException("Can't set format " + mDeviceName, -ret);
+			throw SoundException("Can't set format " + mDeviceName, ret);
 		}
 
 		unsigned int rate = params.rate;
@@ -113,24 +112,24 @@ void AlsaPcm::open(const PcmParams& params)
 		if ((ret = snd_pcm_hw_params_set_rate_near(mHandle, hwParams,
 												   &rate, 0)) < 0)
 		{
-			throw SoundException("Can't set rate " + mDeviceName, -ret);
+			throw SoundException("Can't set rate " + mDeviceName, ret);
 		}
 
 		if ((ret = snd_pcm_hw_params_set_channels(mHandle, hwParams,
 												  params.numChannels)) < 0)
 		{
-			throw SoundException("Can't set channels " + mDeviceName, -ret);
+			throw SoundException("Can't set channels " + mDeviceName, ret);
 		}
 
 		if ((ret = snd_pcm_hw_params(mHandle, hwParams)) < 0)
 		{
-			throw SoundException("Can't set hwParams " + mDeviceName, -ret);
+			throw SoundException("Can't set hwParams " + mDeviceName, ret);
 		}
 
 		if ((ret = snd_pcm_prepare(mHandle)) < 0)
 		{
 			throw SoundException(
-					"Can't prepare audio interface for use", -ret);
+					"Can't prepare audio interface for use", ret);
 		}
 	}
 	catch(const SoundException& e)
@@ -164,6 +163,13 @@ void AlsaPcm::read(uint8_t* buffer, size_t size)
 	DLOG(mLog, DEBUG) << "Read from pcm device: " << mDeviceName
 					  << ", size: " << size;
 
+	if (!mHandle)
+	{
+		throw SoundException("Alsa device is not opened: " +
+							 mDeviceName + ". Error: " +
+							 snd_strerror(-EFAULT), -EFAULT);
+	}
+
 	auto numFrames = snd_pcm_bytes_to_frames(mHandle, size);
 
 	while(numFrames > 0)
@@ -181,7 +187,7 @@ void AlsaPcm::read(uint8_t* buffer, size_t size)
 			{
 				throw SoundException("Read from audio interface failed: " +
 									 mDeviceName + ". Error: " +
-									 snd_strerror(status), -status);
+									 snd_strerror(status), status);
 			}
 			else
 			{
@@ -196,6 +202,13 @@ void AlsaPcm::write(uint8_t* buffer, size_t size)
 {
 	DLOG(mLog, DEBUG) << "Write to pcm device: " << mDeviceName
 					  << ", size: " << size;
+
+	if (!mHandle)
+	{
+		throw SoundException("Alsa device is not opened: " +
+							 mDeviceName + ". Error: " +
+							 snd_strerror(-EFAULT), -EFAULT);
+	}
 
 	auto numFrames = snd_pcm_bytes_to_frames(mHandle, size);
 
@@ -214,7 +227,7 @@ void AlsaPcm::write(uint8_t* buffer, size_t size)
 			{
 				throw SoundException("Write to audio interface failed: " +
 									 mDeviceName + ". Error: " +
-									 snd_strerror(status), -status);
+									 snd_strerror(status), status);
 			}
 			else
 			{
@@ -268,7 +281,7 @@ snd_pcm_format_t AlsaPcm::convertPcmFormat(uint8_t format)
 		}
 	}
 
-	throw SoundException("Can't convert format", XEN_EINVAL);
+	throw SoundException("Can't convert format", -EINVAL);
 }
 
 }
