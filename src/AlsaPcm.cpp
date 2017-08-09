@@ -68,10 +68,9 @@ void AlsaPcm::open(const PcmParams& params)
 	try
 	{
 		DLOG(mLog, DEBUG) << "Open pcm device: " << mDeviceName
-						  << ", format: " << params.format
+						  << ", format: " << static_cast<int>(params.format)
 						  << ", rate: " << params.rate
-						  << ", channels: " << params.numChannels;
-
+						  << ", channels: " << static_cast<int>(params.numChannels);
 
 		snd_pcm_stream_t streamType = mType == StreamType::PLAYBACK ?
 				SND_PCM_STREAM_PLAYBACK : SND_PCM_STREAM_CAPTURE;
