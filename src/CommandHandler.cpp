@@ -176,7 +176,7 @@ void CommandHandler::getBufferRefs(grant_ref_t startDirectory, uint32_t size,
 							  offsetof(xensnd_page_directory, gref)) /
 							  sizeof(uint32_t));
 
-		DLOG(mLog, ERROR) << "Gref address: " << pageDirectory->gref
+		DLOG(mLog, DEBUG) << "Gref address: " << pageDirectory->gref
 						  << ", numGrefs " << numGrefs;
 
 		refs.insert(refs.end(), pageDirectory->gref,
