@@ -86,13 +86,7 @@ public:
 	 * @param id      frontend instance id
 	 */
 	SndFrontendHandler(Config& config, const std::string devName,
-					   domid_t beDomId, domid_t feDomId, uint16_t devId) :
-		FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId, devId),
-#ifdef WITH_PULSE
-		mPulseMainloop(getDomName()),
-#endif
-		mConfig(config),
-		mLog("SndFrontend") {}
+					   domid_t beDomId, domid_t feDomId, uint16_t devId);
 
 protected:
 
@@ -109,7 +103,7 @@ protected:
 private:
 
 #ifdef WITH_PULSE
-	Pulse::PulseMainloop mPulseMainloop;
+	std::unique_ptr<Pulse::PulseMainloop> mPulseMainloop;
 #endif
 
 	Config& mConfig;

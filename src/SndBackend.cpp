@@ -20,6 +20,7 @@
 
 #include "SndBackend.hpp"
 
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -42,6 +43,7 @@
 using std::cout;
 using std::endl;
 using std::exception;
+using std::ofstream;
 using std::signal;
 using std::shared_ptr;
 using std::string;
@@ -61,8 +63,12 @@ using SoundItf::StreamType;
 using SoundItf::PcmDevice;
 using SoundItf::PcmType;
 
+#ifdef WITH_PULSE
+using Pulse::PulseMainloop;
+#endif
 
 string gCfgFileName;
+string gLogFileName;
 
 /*******************************************************************************
  * StreamRingBuffer
@@ -98,6 +104,22 @@ void StreamRingBuffer::processRequest(const xensnd_req& req)
 /*******************************************************************************
  * SndFrontendHandler
  ******************************************************************************/
+SndFrontendHandler::SndFrontendHandler(Config& config, const string devName,
+									   domid_t beDomId, domid_t feDomId,
+									   uint16_t devId) :
+	FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId, devId),
+	mConfig(config),
+	mLog("SndFrontend")
+{
+	if (mConfig.getPcmType() == PcmType::PULSE)
+	{
+#ifdef WITH_PULSE
+		mPulseMainloop.reset(new PulseMainloop(getDomName()));
+#else
+		throw FrontendHandlerException("Pulse PCM is not supported");
+#endif
+	}
+}
 
 void SndFrontendHandler::onBind()
 {
@@ -198,7 +220,7 @@ shared_ptr<PcmDevice> SndFrontendHandler::createPcmDevice(StreamType type,
 
 		mConfig.getStreamPropery(type, id, propName, propValue);
 
-		pcmDevice.reset(mPulseMainloop.createStream(type, to_string(id),
+		pcmDevice.reset(mPulseMainloop->createStream(type, to_string(id),
 						propName, propValue, deviceName));
 #else
 		throw FrontendHandlerException("Pulse PCM is not supported");
@@ -261,15 +283,15 @@ void waitSignals()
 
 bool commandLineOptions(int argc, char *argv[])
 {
-
 	int opt = -1;
 
-	while((opt = getopt(argc, argv, "c:v:fh?")) != -1)
+	while((opt = getopt(argc, argv, "c:v:l:fh?")) != -1)
 	{
 		switch(opt)
 		{
 		case 'v':
-			if (!Log::setLogLevel(string(optarg)))
+
+			if (!Log::setLogMask(string(optarg)))
 			{
 				return false;
 			}
@@ -282,11 +304,20 @@ bool commandLineOptions(int argc, char *argv[])
 
 			break;
 
+		case 'l':
+
+			gLogFileName = optarg;
+
+			break;
+
 		case 'f':
+
 			Log::setShowFileAndLine(true);
+
 			break;
 
 		default:
+
 			return false;
 		}
 	}
@@ -302,6 +333,14 @@ int main(int argc, char *argv[])
 
 		if (commandLineOptions(argc, argv))
 		{
+			ofstream logFile;
+
+			if (!gLogFileName.empty())
+			{
+				logFile.open(gLogFileName);
+				Log::setStreamBuffer(logFile.rdbuf());
+			}
+
 			Config config(gCfgFileName);
 
 			SndBackend sndBackend(config, XENSND_DRIVER_NAME, 0);
@@ -311,13 +350,20 @@ int main(int argc, char *argv[])
 			waitSignals();
 
 			sndBackend.stop();
+
+			logFile.close();
 		}
 		else
 		{
-			cout << "Usage: " << argv[0] << " [-v <level>]" << endl;
-			cout << "\t-v -- verbose level "
-				 << "(disable, error, warning, info, debug)" << endl;
+			cout << "Usage: " << argv[0]
+				 << " [-c <file>] [-l <file>] [-v <level>]"
+				 << endl;
 			cout << "\t-c -- config file" << endl;
+			cout << "\t-l -- log file" << endl;
+			cout << "\t-v -- verbose level in format: "
+				 << "<module>:<level>;<module:<level>" << endl;
+			cout << "\t      use * for mask selection:"
+				 << " *:Debug,Mod*:Info" << endl;
 		}
 	}
 	catch(const exception& e)
