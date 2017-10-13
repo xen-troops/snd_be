@@ -343,7 +343,7 @@ int main(int argc, char *argv[])
 
 			Config config(gCfgFileName);
 
-			SndBackend sndBackend(config, XENSND_DRIVER_NAME, 0);
+			SndBackend sndBackend(config, XENSND_DRIVER_NAME);
 
 			sndBackend.start();
 
