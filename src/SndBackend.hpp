@@ -127,8 +127,8 @@ class SndBackend : public XenBackend::BackendBase
 {
 public:
 
-	SndBackend(Config& config, const std::string& deviceName,
-			   domid_t domId) : BackendBase("SndBackend", deviceName, domId),
+	SndBackend(Config& config, const std::string& deviceName) :
+		BackendBase("SndBackend", deviceName),
 		mConfig(config)
 	{}
 
