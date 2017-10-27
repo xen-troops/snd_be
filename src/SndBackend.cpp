@@ -114,7 +114,7 @@ SndFrontendHandler::SndFrontendHandler(Config& config, const string devName,
 	if (mConfig.getPcmType() == PcmType::PULSE)
 	{
 #ifdef WITH_PULSE
-		mPulseMainloop.reset(new PulseMainloop(getDomName()));
+		mPulseMainloop.reset(new PulseMainloop("Dom" + to_string(feDomId)));
 #else
 		throw FrontendHandlerException("Pulse PCM is not supported");
 #endif
