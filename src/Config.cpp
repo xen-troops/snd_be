@@ -75,7 +75,7 @@ Config::Config(const string& fileName) :
  * Public
  ******************************************************************************/
 
-string Config::getStreamDevice(StreamType type, uint32_t id)
+string Config::getStreamDevice(StreamType type, const string& id)
 {
 	if (type == StreamType::PLAYBACK)
 	{
@@ -93,7 +93,7 @@ string Config::getStreamDevice(StreamType type, uint32_t id)
 						  to_string(static_cast<int>(type)));
 }
 
-void Config::getStreamPropery(StreamType type, uint32_t id,
+void Config::getStreamPropery(StreamType type, const string& id,
 							  string& name, string& value)
 {
 	if (type == StreamType::PLAYBACK)
@@ -201,7 +201,7 @@ string Config::readDefaultCapturePropName()
 	return propName;
 }
 
-string Config::readDevice(const string& sectionName, uint32_t id,
+string Config::readDevice(const string& sectionName, const string& id,
 						  const string& defaultValue)
 {
 	if (mConfig.exists(sectionName))
@@ -210,7 +210,7 @@ string Config::readDevice(const string& sectionName, uint32_t id,
 
 		for (int i = 0; i < section.getLength(); i++)
 		{
-			if (static_cast<uint32_t>(section[i].lookup("id")) == id)
+			if (static_cast<const string&>(section[i].lookup("id")) == id)
 			{
 				string device;
 
@@ -225,7 +225,7 @@ string Config::readDevice(const string& sectionName, uint32_t id,
 	return defaultValue;
 }
 
-void Config::readProperty(const string& sectionName, uint32_t id,
+void Config::readProperty(const string& sectionName, const string& id,
 						  string& name, string& value,
 						  const string& defaultPropName)
 {
@@ -233,7 +233,7 @@ void Config::readProperty(const string& sectionName, uint32_t id,
 
 	for (int i = 0; i < section.getLength(); i++)
 	{
-		if (static_cast<uint32_t>(section[i].lookup("id")) == id)
+		if (static_cast<const string&>(section[i].lookup("id")) == id)
 		{
 			if (!section[i].lookupValue("propName", name))
 			{

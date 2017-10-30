@@ -75,12 +75,13 @@ public:
 	/**
 	 * Returns device name for stream
 	 */
-	std::string getStreamDevice(SoundItf::StreamType type, uint32_t id);
+	std::string getStreamDevice(SoundItf::StreamType type,
+								const std::string& id);
 
 	/**
 	 * Returns stream property
 	 */
-	void getStreamPropery(SoundItf::StreamType type, uint32_t id,
+	void getStreamPropery(SoundItf::StreamType type, const std::string& id,
 						  std::string& name, std::string& value);
 
 private:
@@ -103,15 +104,14 @@ private:
 	std::string readDefaultPlaybackPropName();
 	std::string readDefaultCapturePropName();
 
-	std::string readDevice(const std::string& sectionName, uint32_t id,
+	std::string readDevice(const std::string& sectionName,
+						   const std::string& id,
 						   const std::string& defaultValue);
 
-	void readProperty(const std::string& sectionName, uint32_t id,
+	void readProperty(const std::string& sectionName, const std::string& id,
 					  std::string& name, std::string& value,
 					  const std::string& defaultPropName);
-	/*
-	readProperty(const std::string& sectionName, uint32_t id);
-*/
+
 	libconfig::Setting& findSettingByDomain(const std::string& sectionName,
 											const std::string& domName,
 											uint16_t devId);

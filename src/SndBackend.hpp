@@ -60,12 +60,13 @@ public:
 	 * @param port  event channel port number
 	 * @param ref   grant table reference
 	 */
-	StreamRingBuffer(int id, std::shared_ptr<SoundItf::PcmDevice> pcmDevice,
+	StreamRingBuffer(const std::string& id,
+					 std::shared_ptr<SoundItf::PcmDevice> pcmDevice,
 					 SoundItf::StreamType streamType, domid_t domId,
 					 evtchn_port_t port, grant_ref_t ref);
 
 private:
-	int mId;
+	std::string mId;
 	CommandHandler mCommandHandler;
 	XenBackend::Log mLog;
 
@@ -111,8 +112,8 @@ private:
 	XenBackend::Log mLog;
 
 	std::shared_ptr<SoundItf::PcmDevice> createPcmDevice(
-			SoundItf::StreamType type, int id);
-	void createStream(int id, SoundItf::StreamType type,
+			SoundItf::StreamType type, const std::string& id);
+	void createStream(const std::string& id, SoundItf::StreamType type,
 					  const std::string& streamPath);
 	void processCard(const std::string& cardPath);
 	void processDevice(const std::string& devPath);
