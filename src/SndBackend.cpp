@@ -74,14 +74,15 @@ string gLogFileName;
  * StreamRingBuffer
  ******************************************************************************/
 
-StreamRingBuffer::StreamRingBuffer(int id, shared_ptr<PcmDevice> pcmDevice,
+StreamRingBuffer::StreamRingBuffer(const string& id,
+								   shared_ptr<PcmDevice> pcmDevice,
 								   StreamType streamType, domid_t domId,
 								   evtchn_port_t port, grant_ref_t ref) :
 	RingBufferInBase<xen_sndif_back_ring, xen_sndif_sring,
 					 xensnd_req, xensnd_resp>(domId, port, ref),
 	mId(id),
 	mCommandHandler(pcmDevice, streamType, domId),
-	mLog("StreamRing(" + to_string(id) + ")")
+	mLog("StreamRing(" + id + ")")
 {
 	LOG(mLog, DEBUG) << "Create stream ring buffer: id = " << id
 					 << ", type:" << static_cast<int>(streamType);
@@ -163,7 +164,8 @@ void SndFrontendHandler::processDevice(const std::string& devPath)
 
 void SndFrontendHandler::processStream(const std::string& streamPath)
 {
-	int id = getXenStore().readInt(streamPath + XENSND_FIELD_STREAM_UNIQUE_ID);
+	auto id = getXenStore().readString(streamPath +
+									   XENSND_FIELD_STREAM_UNIQUE_ID);
 	StreamType streamType = StreamType::PLAYBACK;
 
 	if (getXenStore().readString(streamPath + XENSND_FIELD_TYPE) ==
@@ -175,7 +177,7 @@ void SndFrontendHandler::processStream(const std::string& streamPath)
 	createStream(id, streamType, streamPath);
 }
 
-void SndFrontendHandler::createStream(int id, StreamType type,
+void SndFrontendHandler::createStream(const string& id, StreamType type,
 									  const string& streamPath)
 {
 	auto port = getXenStore().readInt(streamPath + XENSND_FIELD_EVT_CHNL);
@@ -197,7 +199,7 @@ void SndFrontendHandler::createStream(int id, StreamType type,
 }
 
 shared_ptr<PcmDevice> SndFrontendHandler::createPcmDevice(StreamType type,
-														  int id)
+														  const string& id)
 {
 	shared_ptr<PcmDevice> pcmDevice;
 
@@ -220,7 +222,7 @@ shared_ptr<PcmDevice> SndFrontendHandler::createPcmDevice(StreamType type,
 
 		mConfig.getStreamPropery(type, id, propName, propValue);
 
-		pcmDevice.reset(mPulseMainloop->createStream(type, to_string(id),
+		pcmDevice.reset(mPulseMainloop->createStream(type, id,
 						propName, propValue, deviceName));
 #else
 		throw FrontendHandlerException("Pulse PCM is not supported");
