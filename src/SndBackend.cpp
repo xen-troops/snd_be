@@ -32,6 +32,8 @@
 #include <xen/errno.h>
 #include <xen/be/XenStore.hpp>
 
+#include "Version.hpp"
+
 /***************************************************************************//**
  * @mainpage snd_be
  *
@@ -56,6 +58,7 @@ using XenBackend::FrontendHandlerPtr;
 using XenBackend::Log;
 using XenBackend::RingBufferPtr;
 using XenBackend::RingBufferInBase;
+using XenBackend::Utils;
 using XenBackend::XenStore;
 
 using SoundItf::SoundException;
@@ -335,6 +338,9 @@ int main(int argc, char *argv[])
 
 		if (commandLineOptions(argc, argv))
 		{
+			LOG("Main", INFO) << "backend version:  " << VERSION;
+			LOG("Main", INFO) << "libxenbe version: " << Utils::getVersion();
+
 			ofstream logFile;
 
 			if (!gLogFileName.empty())
