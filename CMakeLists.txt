@@ -59,6 +59,7 @@ endif()
 include_directories(
 	${XEN_INCLUDE_PATH}
 	${XENBE_INCLUDE_PATH}
+	${CMAKE_CURRENT_BINARY_DIR}
 	.
 )
 
@@ -76,6 +77,22 @@ link_directories(
 ################################################################################
 
 add_subdirectory(src)
+
+################################################################################
+# Versioning
+################################################################################
+
+find_package(Git)
+
+add_custom_target(Version
+	COMMAND ${CMAKE_COMMAND}
+	-D GIT_EXECUTABLE=${GIT_EXECUTABLE}
+	-D INPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/Version.hpp.in
+	-D OUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/Version.hpp
+	-P ${CMAKE_CURRENT_SOURCE_DIR}/generateVersion.cmake
+)
+
+add_dependencies(${PROJECT_NAME} Version)
 
 ################################################################################
 # Docs
