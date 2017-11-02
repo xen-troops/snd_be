@@ -22,7 +22,7 @@
 
 #include <sys/mman.h>
 
-#include <xen/errno.h>
+#include <errno.h>
 
 #ifdef WITH_ALSA
 #include "AlsaPcm.hpp"
@@ -32,11 +32,14 @@
 #include "PulsePcm.hpp"
 #endif
 
+using std::bind;
 using std::min;
 using std::out_of_range;
 using std::shared_ptr;
 using std::vector;
 using std::unordered_map;
+
+using namespace std::placeholders;
 
 using XenBackend::XenException;
 using XenBackend::XenGnttabBuffer;
@@ -44,14 +47,14 @@ using XenBackend::XenGnttabBuffer;
 using SoundItf::PcmDevice;
 using SoundItf::PcmParams;
 using SoundItf::SoundException;
-using SoundItf::StreamType;
 
 unordered_map<int, CommandHandler::CommandFn> CommandHandler::sCmdTable =
 {
 	{XENSND_OP_OPEN,	&CommandHandler::open},
 	{XENSND_OP_CLOSE,	&CommandHandler::close},
 	{XENSND_OP_READ,	&CommandHandler::read},
-	{XENSND_OP_WRITE,	&CommandHandler::write}
+	{XENSND_OP_WRITE,	&CommandHandler::write},
+	{XENSND_OP_TRIGGER, &CommandHandler::trigger}
 };
 
 /*******************************************************************************
@@ -59,11 +62,16 @@ unordered_map<int, CommandHandler::CommandFn> CommandHandler::sCmdTable =
  ******************************************************************************/
 
 CommandHandler::CommandHandler(shared_ptr<PcmDevice> pcmDevice,
-							   StreamType type, int domId) :
+							   EventRingBufferPtr eventRingBuffer,
+							   domid_t domId) :
 	mPcmDevice(pcmDevice),
 	mDomId(domId),
+	mEventRingBuffer(eventRingBuffer),
+	mEventId(0),
 	mLog("CommandHandler")
 {
+	pcmDevice->setProgressCbk(bind(&CommandHandler::progressCbk, this, _1));
+
 	LOG(mLog, DEBUG) << "Create command handler, dom: " << mDomId;
 }
 
@@ -88,7 +96,7 @@ int CommandHandler::processCommand(const xensnd_req& req)
 	{
 		LOG(mLog, ERROR) << e.what();
 
-		status = XEN_EINVAL;
+		status = -EINVAL;
 	}
 	catch(const SoundException& e)
 	{
@@ -106,6 +114,15 @@ int CommandHandler::processCommand(const xensnd_req& req)
  * Private
  ******************************************************************************/
 
+void CommandHandler::progressCbk(uint64_t frame)
+{
+	xensnd_evt event = { .id = mEventId++, .type = XENSND_EVT_CUR_POS };
+
+	event.op.cur_pos.position = frame;
+
+	mEventRingBuffer->sendEvent(event);
+}
+
 void CommandHandler::open(const xensnd_req& req)
 {
 	DLOG(mLog, DEBUG) << "Handle command [OPEN]";
@@ -119,8 +136,8 @@ void CommandHandler::open(const xensnd_req& req)
 	mBuffer.reset(new XenGnttabBuffer(mDomId, refs.data(), refs.size(),
 									  PROT_READ | PROT_WRITE));
 
-	mPcmDevice->open(PcmParams(openReq.pcm_rate, openReq.pcm_format,
-							   openReq.pcm_channels));
+	mPcmDevice->open( {openReq.pcm_rate, openReq.pcm_format,
+					   openReq.pcm_channels });
 }
 
 void CommandHandler::close(const xensnd_req& req)
@@ -150,6 +167,33 @@ void CommandHandler::write(const xensnd_req& req)
 
 	mPcmDevice->write(&(static_cast<uint8_t*>(mBuffer->get())[writeReq.offset]),
 					  writeReq.length);
+}
+
+void CommandHandler::trigger(const xensnd_req& req)
+{
+	const xensnd_trigger_req& triggerReq = req.op.trigger;
+
+	switch(triggerReq.type)
+	{
+	case XENSND_OP_TRIGGER_START:
+		DLOG(mLog, DEBUG) << "Handle command [TRIGGER][START]";
+		mPcmDevice->start();
+		break;
+	case XENSND_OP_TRIGGER_PAUSE:
+		DLOG(mLog, DEBUG) << "Handle command [TRIGGER][PAUSE]";
+		mPcmDevice->pause();
+		break;
+	case XENSND_OP_TRIGGER_STOP:
+		DLOG(mLog, DEBUG) << "Handle command [TRIGGER][STOP]";
+		mPcmDevice->stop();
+		break;
+	case XENSND_OP_TRIGGER_RESUME:
+		DLOG(mLog, DEBUG) << "Handle command [TRIGGER][RESUME]";
+		mPcmDevice->resume();
+		break;
+	default:
+		throw SoundException("Unknown trigger type", -EINVAL);
+	}
 }
 
 void CommandHandler::getBufferRefs(grant_ref_t startDirectory, uint32_t size,

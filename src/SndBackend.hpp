@@ -62,8 +62,8 @@ public:
 	 */
 	StreamRingBuffer(const std::string& id,
 					 std::shared_ptr<SoundItf::PcmDevice> pcmDevice,
-					 SoundItf::StreamType streamType, domid_t domId,
-					 evtchn_port_t port, grant_ref_t ref);
+					 EventRingBufferPtr eventRingBuffer,
+					 domid_t domId, evtchn_port_t port, grant_ref_t ref);
 
 private:
 	std::string mId;

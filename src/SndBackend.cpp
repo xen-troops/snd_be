@@ -77,18 +77,17 @@ string gLogFileName;
  * StreamRingBuffer
  ******************************************************************************/
 
-StreamRingBuffer::StreamRingBuffer(const string& id,
-								   shared_ptr<PcmDevice> pcmDevice,
-								   StreamType streamType, domid_t domId,
-								   evtchn_port_t port, grant_ref_t ref) :
+StreamRingBuffer::StreamRingBuffer(const string& id, shared_ptr<PcmDevice> pcmDevice,
+								   EventRingBufferPtr eventRingBuffer,
+								   domid_t domId, evtchn_port_t port,
+								   grant_ref_t ref) :
 	RingBufferInBase<xen_sndif_back_ring, xen_sndif_sring,
 					 xensnd_req, xensnd_resp>(domId, port, ref),
 	mId(id),
-	mCommandHandler(pcmDevice, streamType, domId),
-	mLog("StreamRing(" + id + ")")
+	mCommandHandler(pcmDevice, eventRingBuffer, domId),
+	mLog("StreamRing(" + mId + ")")
 {
-	LOG(mLog, DEBUG) << "Create stream ring buffer: id = " << id
-					 << ", type:" << static_cast<int>(streamType);
+	LOG(mLog, DEBUG) << "Create stream ring buffer: id = " << id;
 }
 
 void StreamRingBuffer::processRequest(const xensnd_req& req)
@@ -118,7 +117,8 @@ SndFrontendHandler::SndFrontendHandler(Config& config, const string devName,
 	if (mConfig.getPcmType() == PcmType::PULSE)
 	{
 #ifdef WITH_PULSE
-		mPulseMainloop.reset(new PulseMainloop("Dom" + to_string(feDomId)));
+		mPulseMainloop.reset(new PulseMainloop("Dom" + to_string(feDomId) +
+											   ":" + to_string(devId)));
 #else
 		throw FrontendHandlerException("Pulse PCM is not supported");
 #endif
@@ -183,22 +183,44 @@ void SndFrontendHandler::processStream(const std::string& streamPath)
 void SndFrontendHandler::createStream(const string& id, StreamType type,
 									  const string& streamPath)
 {
-	auto port = getXenStore().readInt(streamPath + XENSND_FIELD_EVT_CHNL);
+	auto reqPort = getXenStore().readInt(streamPath +
+										 XENSND_FIELD_EVT_CHNL);
 
-	LOG(mLog, DEBUG) << "Read event channel port: " << port
+	LOG(mLog, DEBUG) << "Read req event channel: " << reqPort
 					 << ", dom: " << getDomId();
 
-	uint32_t ref = getXenStore().readInt(streamPath + XENSND_FIELD_RING_REF);
+	uint32_t reqRef = getXenStore().readInt(streamPath +
+											XENSND_FIELD_RING_REF);
 
-	LOG(mLog, DEBUG) << "Read ring buffer ref: " << ref
+	LOG(mLog, DEBUG) << "Read req ring buffer ref: " << reqRef
+					 << ", dom: " << getDomId();
+
+	auto evtPort = getXenStore().readInt(streamPath +
+										 XENSND_FIELD_EVT_EVT_CHNL);
+
+	LOG(mLog, DEBUG) << "Read evt event channel: " << evtPort
+					 << ", dom: " << getDomId();
+
+	uint32_t evtRef = getXenStore().readInt(streamPath +
+											XENSND_FIELD_EVT_RING_REF);
+
+	LOG(mLog, DEBUG) << "Read evt ring buffer ref: " << evtRef
 					 << ", dom: " << getDomId();
 
 	auto pcmDevice = createPcmDevice(type, id);
 
-	RingBufferPtr ringBuffer(
-			new StreamRingBuffer(id, pcmDevice, type, getDomId(), port, ref));
 
-	addRingBuffer(ringBuffer);
+	EventRingBufferPtr evtRingBuffer(new EventRingBuffer(
+			getDomId(), evtPort, evtRef, XENSND_IN_RING_OFFS,
+			XENSND_IN_RING_SIZE));
+
+	addRingBuffer(evtRingBuffer);
+
+	RingBufferPtr reqRingBuffer(
+			new StreamRingBuffer(id, pcmDevice, evtRingBuffer, getDomId(),
+								 reqPort, reqRef));
+
+	addRingBuffer(reqRingBuffer);
 }
 
 shared_ptr<PcmDevice> SndFrontendHandler::createPcmDevice(StreamType type,
