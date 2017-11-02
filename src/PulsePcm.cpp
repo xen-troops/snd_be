@@ -201,6 +201,7 @@ PulsePcm::PulsePcm(pa_threaded_mainloop* mainloop, pa_context* context,
 	mMainloop(mainloop),
 	mContext(context),
 	mStream(nullptr),
+	mTimeEvent(nullptr),
 	mSuccess(0),
 	mMutex(mainloop),
 	mType(type),
@@ -302,11 +303,28 @@ void PulsePcm::open(const PcmParams& params)
 	}
 
 	waitStreamReady();
+
+	timeval now;
+	gettimeofday(&now, nullptr);
+	pa_timeval_add(&now, 100000);
+
+	auto api = pa_threaded_mainloop_get_api(mMainloop);
+	mTimeEvent = api->time_new(api, &now, sTimeEventCbk, this);
+
+	if (!mTimeEvent)
+	{
+		throw SoundException("Can't create time event " + mName, -PA_ERR_UNKNOWN);
+	}
 }
 
 void PulsePcm::close()
 {
 	lock_guard<PulseMutex> lock(mMutex);
+
+	if (mTimeEvent)
+	{
+		pa_threaded_mainloop_get_api(mMainloop)->time_free(mTimeEvent);
+	}
 
 	if (mStream)
 	{
@@ -451,6 +469,26 @@ void PulsePcm::write(uint8_t* buffer, size_t size)
 	}
 }
 
+void PulsePcm::start()
+{
+
+}
+
+void PulsePcm::stop()
+{
+
+}
+
+void PulsePcm::pause()
+{
+
+}
+
+void PulsePcm::resume()
+{
+
+}
+
 /*******************************************************************************
  * Private
  ******************************************************************************/
@@ -475,6 +513,16 @@ void PulsePcm::sSuccessCbk(pa_stream* stream, int success, void *data)
 	static_cast<PulsePcm*>(data)->successCbk(success);
 }
 
+void PulsePcm::sTimeEventCbk(pa_mainloop_api *api, pa_time_event *timeEvent, const struct timeval *tv, void *data)
+{
+	static_cast<PulsePcm*>(data)->timeEventCbk(api, timeEvent, tv);
+}
+
+void PulsePcm::sUpdateTimingCbk(pa_stream *stream, int success, void *data)
+{
+	static_cast<PulsePcm*>(data)->updateTimingCbk(success);
+}
+
 void PulsePcm::streamStateChanged()
 {
 	switch (pa_stream_get_state(mStream))
@@ -494,12 +542,12 @@ void PulsePcm::streamStateChanged()
 
 void PulsePcm::streamRequest(size_t nbytes)
 {
-    pa_threaded_mainloop_signal(mMainloop, 0);
+	pa_threaded_mainloop_signal(mMainloop, 0);
 }
 
 void PulsePcm::latencyUpdate()
 {
-    pa_threaded_mainloop_signal(mMainloop, 0);
+	pa_threaded_mainloop_signal(mMainloop, 0);
 }
 
 void PulsePcm::successCbk(int success)
@@ -507,6 +555,42 @@ void PulsePcm::successCbk(int success)
 	mSuccess = success;
 
 	pa_threaded_mainloop_signal(mMainloop, 0);
+}
+
+void PulsePcm::timeEventCbk(pa_mainloop_api *api, pa_time_event *timeEvent, const struct timeval *tv)
+{
+	if (mStream && pa_stream_get_state(mStream) == PA_STREAM_READY)
+	{
+		pa_operation *op = pa_stream_update_timing_info(mStream, sUpdateTimingCbk, this);
+
+		if (!op)
+		{
+			LOG(mLog, ERROR) << "Can't update timing info";
+		}
+		else
+		{
+			pa_operation_unref(op);
+		}
+	}
+
+	timeval now;
+
+	gettimeofday(&now, nullptr);
+	pa_timeval_add(&now, 100000);
+	api->time_restart(timeEvent, &now);
+}
+
+void PulsePcm::updateTimingCbk(int success)
+{
+	pa_usec_t time;
+
+	const pa_timing_info* info = pa_stream_get_timing_info(mStream);
+
+
+	pa_stream_get_time(mStream, &time);
+
+	LOG(mLog, DEBUG) << "Update timing: " << time / 1000;
+	LOG(mLog, DEBUG) << "Update info: " << info->timestamp.tv_sec;
 }
 
 void PulsePcm::waitStreamReady()
