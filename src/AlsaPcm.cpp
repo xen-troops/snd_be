@@ -95,9 +95,6 @@ void AlsaPcm::open(const PcmParams& params)
 
 		mFrameWritten = 0;
 		mFrameUnderrun = 0;
-
-		mTimer.start();
-
 	}
 	catch(const SoundException& e)
 	{
@@ -246,6 +243,8 @@ void AlsaPcm::start()
 	{
 		throw SoundException("Can't start device " + mDeviceName, ret);
 	}
+
+	mTimer.start();
 }
 
 void AlsaPcm::stop()

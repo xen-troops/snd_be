@@ -47,7 +47,7 @@ public:
 	 * @param name pcm device name
 	 */
 	explicit AlsaPcm(SoundItf::StreamType type,
-					 const std::string& deviceName = "hw:0");
+					 const std::string& deviceName = "default");
 	~AlsaPcm();
 
 	/**
