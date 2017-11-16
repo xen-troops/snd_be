@@ -89,7 +89,8 @@ add_custom_target(Version
 	-D GIT_EXECUTABLE=${GIT_EXECUTABLE}
 	-D INPUT_FILE=${CMAKE_CURRENT_SOURCE_DIR}/Version.hpp.in
 	-D OUTPUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/Version.hpp
-	-P ${CMAKE_CURRENT_SOURCE_DIR}/generateVersion.cmake
+	-D GIT_SOURCE_DIR=${CMAKE_SOURCE_DIR}
+	-P ${CMAKE_SOURCE_DIR}/generateVersion.cmake
 )
 
 add_dependencies(${PROJECT_NAME} Version)
