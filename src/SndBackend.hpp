@@ -27,7 +27,6 @@
 #include <xen/be/Log.hpp>
 
 #include "CommandHandler.hpp"
-#include "Config.hpp"
 
 #ifdef WITH_ALSA
 #include "AlsaPcm.hpp"
@@ -82,11 +81,12 @@ class SndFrontendHandler : public XenBackend::FrontendHandlerBase
 public:
 
 	/**
-	 * @param domId   frontend domain id
-	 * @param backend backend instance
-	 * @param id      frontend instance id
+	 * @param devName device name
+	 * @param beDomId backend domain id
+	 * @param feDomId frontend domain id
+	 * @param devId   device id
 	 */
-	SndFrontendHandler(Config& config, const std::string devName,
+	SndFrontendHandler(const std::string devName,
 					   domid_t beDomId, domid_t feDomId, uint16_t devId);
 
 protected:
@@ -107,8 +107,6 @@ private:
 	std::unique_ptr<Pulse::PulseMainloop> mPulseMainloop;
 #endif
 
-	Config& mConfig;
-
 	XenBackend::Log mLog;
 
 	std::shared_ptr<SoundItf::PcmDevice> createPcmDevice(
@@ -128,10 +126,8 @@ class SndBackend : public XenBackend::BackendBase
 {
 public:
 
-	SndBackend(Config& config, const std::string& deviceName) :
-		BackendBase("SndBackend", deviceName),
-		mConfig(config)
-	{}
+	SndBackend(const std::string& deviceName) :
+		BackendBase("SndBackend", deviceName) {}
 
 protected:
 
@@ -141,10 +137,6 @@ protected:
 	 * @param devId device id
 	 */
 	void onNewFrontend(domid_t domId, uint16_t devId) override;
-
-private:
-
-	Config& mConfig;
 };
 
 #endif /* SRC_SNDBACKEND_HPP_ */
