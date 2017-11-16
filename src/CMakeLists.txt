@@ -4,21 +4,16 @@
 
 include(FindPkgConfig)
 
-pkg_check_modules (CONFIG REQUIRED libconfig++)
-if (!CONFIG_FOUND)
-	message(FATAL_ERROR "No libconfig++ found")
-endif()
-
 if(WITH_ALSA)
 	pkg_check_modules (ALSA REQUIRED alsa)
-	if (!ALSA_FOUND)
+	if (NOT ALSA_FOUND)
 		message(FATAL_ERROR "No alsa found")
 	endif()
 endif()
 
 if(WITH_PULSE)
 	pkg_check_modules (PULSE REQUIRED libpulse)
-	if(!PULSE_FOUND)
+	if(NOT PULSE_FOUND)
 		message(FATAL_ERROR "No pulse found")
 	endif()
 endif()
@@ -33,7 +28,6 @@ endif()
 
 set(SOURCES
 	CommandHandler.cpp
-	Config.cpp
 	SndBackend.cpp
 )
 
@@ -46,6 +40,12 @@ endif()
 if(WITH_PULSE)
 	list(APPEND SOURCES
 		PulsePcm.cpp
+	)
+endif()
+
+if(WITH_MOCKBELIB)
+	list(APPEND SOURCES
+		MockBackend.cpp
 	)
 endif()
 
@@ -69,8 +69,13 @@ if(WITH_PULSE)
 	target_link_libraries(${PROJECT_NAME} ${PULSE_LIBRARIES})
 endif()
 
+set(XENBE_LIB xenbe)
+
+if(WITH_MOCKBELIB)
+	set(XENBE_LIB xenbemock)
+endif()
+
 target_link_libraries(${PROJECT_NAME}
-	xenbe
+	${XENBE_LIB}
 	pthread
-	${CONFIG_LIBRARIES}
 )

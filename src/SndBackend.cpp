@@ -32,6 +32,10 @@
 #include <xen/errno.h>
 #include <xen/be/XenStore.hpp>
 
+#ifdef WITH_MOCKBELIB
+#include "MockBackend.hpp"
+#endif
+
 #include "Version.hpp"
 
 /***************************************************************************//**
@@ -70,7 +74,6 @@ using SoundItf::PcmType;
 using Pulse::PulseMainloop;
 #endif
 
-string gCfgFileName;
 string gLogFileName;
 
 /*******************************************************************************
@@ -107,22 +110,18 @@ void StreamRingBuffer::processRequest(const xensnd_req& req)
 /*******************************************************************************
  * SndFrontendHandler
  ******************************************************************************/
-SndFrontendHandler::SndFrontendHandler(Config& config, const string devName,
+SndFrontendHandler::SndFrontendHandler(const string devName,
 									   domid_t beDomId, domid_t feDomId,
 									   uint16_t devId) :
 	FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId, devId),
-	mConfig(config),
 	mLog("SndFrontend")
 {
-	if (mConfig.getPcmType() == PcmType::PULSE)
-	{
 #ifdef WITH_PULSE
-		mPulseMainloop.reset(new PulseMainloop("Dom" + to_string(feDomId) +
+	mPulseMainloop.reset(new PulseMainloop("Dom" + to_string(feDomId) +
 											   ":" + to_string(devId)));
 #else
-		throw FrontendHandlerException("Pulse PCM is not supported");
+	throw FrontendHandlerException("Pulse PCM is not supported");
 #endif
-	}
 }
 
 void SndFrontendHandler::onBind()
@@ -228,31 +227,21 @@ shared_ptr<PcmDevice> SndFrontendHandler::createPcmDevice(StreamType type,
 {
 	shared_ptr<PcmDevice> pcmDevice;
 
-	if (mConfig.getPcmType() == PcmType::ALSA)
-	{
 #ifdef WITH_ALSA
-		pcmDevice.reset(new Alsa::AlsaPcm(type,
-										  mConfig.getStreamDevice(type, id)));
+	pcmDevice.reset(new Alsa::AlsaPcm(type));
 #else
 		throw FrontendHandlerException("Alsa PCM is not supported");
 #endif
-	}
 
-	if (mConfig.getPcmType() == PcmType::PULSE)
-	{
 #ifdef WITH_PULSE
-		string deviceName = mConfig.getStreamDevice(type, id);
-		string propName;
-		string propValue;
+	string propName;
+	string propValue;
 
-		mConfig.getStreamPropery(type, id, propName, propValue);
-
-		pcmDevice.reset(mPulseMainloop->createStream(type, id,
-						propName, propValue, deviceName));
+	pcmDevice.reset(mPulseMainloop->createStream(type, id,
+					propName, propValue));
 #else
 		throw FrontendHandlerException("Pulse PCM is not supported");
 #endif
-	}
 
 	if (!pcmDevice)
 	{
@@ -269,7 +258,7 @@ shared_ptr<PcmDevice> SndFrontendHandler::createPcmDevice(StreamType type,
 void SndBackend::onNewFrontend(domid_t domId, uint16_t devId)
 {
 	addFrontendHandler(FrontendHandlerPtr(new SndFrontendHandler(
-			mConfig, getDeviceName(), getDomId(), domId, devId)));
+			getDeviceName(), getDomId(), domId, devId)));
 }
 
 /*******************************************************************************
@@ -325,12 +314,6 @@ bool commandLineOptions(int argc, char *argv[])
 
 			break;
 
-		case 'c':
-
-			gCfgFileName = optarg;
-
-			break;
-
 		case 'l':
 
 			gLogFileName = optarg;
@@ -371,9 +354,11 @@ int main(int argc, char *argv[])
 				Log::setStreamBuffer(logFile.rdbuf());
 			}
 
-			Config config(gCfgFileName);
+#ifdef WITH_MOCKBELIB
+			MockBackend mockBackend(0, 1);
+#endif
 
-			SndBackend sndBackend(config, XENSND_DRIVER_NAME);
+			SndBackend sndBackend(XENSND_DRIVER_NAME);
 
 			sndBackend.start();
 
@@ -386,9 +371,8 @@ int main(int argc, char *argv[])
 		else
 		{
 			cout << "Usage: " << argv[0]
-				 << " [-c <file>] [-l <file>] [-v <level>]"
+				 << " [-l <file>] [-v <level>]"
 				 << endl;
-			cout << "\t-c -- config file" << endl;
 			cout << "\t-l -- log file" << endl;
 			cout << "\t-v -- verbose level in format: "
 				 << "<module>:<level>;<module:<level>" << endl;
