@@ -70,7 +70,7 @@ public:
 	 * @param type  Alsa stream type
 	 * @param domId domain id
 	 */
-	CommandHandler(std::shared_ptr<SoundItf::PcmDevice> pcmDevice,
+	CommandHandler(SoundItf::PcmDevicePtr pcmDevice,
 				   EventRingBufferPtr eventRingBuffer, domid_t domId);
 	~CommandHandler();
 
@@ -87,7 +87,7 @@ private:
 
 	static std::unordered_map<int, CommandFn> sCmdTable;
 
-	std::shared_ptr<SoundItf::PcmDevice> mPcmDevice;
+	SoundItf::PcmDevicePtr mPcmDevice;
 	domid_t mDomId;
 	EventRingBufferPtr mEventRingBuffer;
 	std::unique_ptr<XenBackend::XenGnttabBuffer> mBuffer;

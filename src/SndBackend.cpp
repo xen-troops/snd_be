@@ -50,10 +50,11 @@ using std::cout;
 using std::endl;
 using std::exception;
 using std::ofstream;
+using std::replace;
 using std::signal;
-using std::shared_ptr;
 using std::string;
 using std::to_string;
+using std::transform;
 using std::unique_ptr;
 using std::vector;
 
@@ -67,7 +68,7 @@ using XenBackend::XenStore;
 
 using SoundItf::SoundException;
 using SoundItf::StreamType;
-using SoundItf::PcmDevice;
+using SoundItf::PcmDevicePtr;
 using SoundItf::PcmType;
 
 #ifdef WITH_PULSE
@@ -80,7 +81,7 @@ string gLogFileName;
  * StreamRingBuffer
  ******************************************************************************/
 
-StreamRingBuffer::StreamRingBuffer(const string& id, shared_ptr<PcmDevice> pcmDevice,
+StreamRingBuffer::StreamRingBuffer(const string& id, PcmDevicePtr pcmDevice,
 								   EventRingBufferPtr eventRingBuffer,
 								   domid_t domId, evtchn_port_t port,
 								   grant_ref_t ref) :
@@ -88,9 +89,9 @@ StreamRingBuffer::StreamRingBuffer(const string& id, shared_ptr<PcmDevice> pcmDe
 					 xensnd_req, xensnd_resp>(domId, port, ref),
 	mId(id),
 	mCommandHandler(pcmDevice, eventRingBuffer, domId),
-	mLog("StreamRing(" + mId + ")")
+	mLog("StreamRing")
 {
-	LOG(mLog, DEBUG) << "Create stream ring buffer: id = " << id;
+	LOG(mLog, DEBUG) << "Create stream ring buffer, id: " << id;
 }
 
 void StreamRingBuffer::processRequest(const xensnd_req& req)
@@ -114,14 +115,11 @@ SndFrontendHandler::SndFrontendHandler(const string devName,
 									   domid_t beDomId, domid_t feDomId,
 									   uint16_t devId) :
 	FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId, devId),
+#ifdef WITH_PULSE
+	mPulseMainloop("Dom" + to_string(feDomId) + ":" + to_string(devId)),
+#endif
 	mLog("SndFrontend")
 {
-#ifdef WITH_PULSE
-	mPulseMainloop.reset(new PulseMainloop("Dom" + to_string(feDomId) +
-											   ":" + to_string(devId)));
-#else
-	throw FrontendHandlerException("Pulse PCM is not supported");
-#endif
 }
 
 void SndFrontendHandler::onBind()
@@ -185,29 +183,14 @@ void SndFrontendHandler::createStream(const string& id, StreamType type,
 	auto reqPort = getXenStore().readInt(streamPath +
 										 XENSND_FIELD_EVT_CHNL);
 
-	LOG(mLog, DEBUG) << "Read req event channel: " << reqPort
-					 << ", dom: " << getDomId();
-
 	uint32_t reqRef = getXenStore().readInt(streamPath +
 											XENSND_FIELD_RING_REF);
-
-	LOG(mLog, DEBUG) << "Read req ring buffer ref: " << reqRef
-					 << ", dom: " << getDomId();
 
 	auto evtPort = getXenStore().readInt(streamPath +
 										 XENSND_FIELD_EVT_EVT_CHNL);
 
-	LOG(mLog, DEBUG) << "Read evt event channel: " << evtPort
-					 << ", dom: " << getDomId();
-
 	uint32_t evtRef = getXenStore().readInt(streamPath +
 											XENSND_FIELD_EVT_RING_REF);
-
-	LOG(mLog, DEBUG) << "Read evt ring buffer ref: " << evtRef
-					 << ", dom: " << getDomId();
-
-	auto pcmDevice = createPcmDevice(type, id);
-
 
 	EventRingBufferPtr evtRingBuffer(new EventRingBuffer(
 			getDomId(), evtPort, evtRef, XENSND_IN_RING_OFFS,
@@ -216,39 +199,149 @@ void SndFrontendHandler::createStream(const string& id, StreamType type,
 	addRingBuffer(evtRingBuffer);
 
 	RingBufferPtr reqRingBuffer(
-			new StreamRingBuffer(id, pcmDevice, evtRingBuffer, getDomId(),
+			new StreamRingBuffer(id, createPcmDevice(type, id),
+								 evtRingBuffer, getDomId(),
 								 reqPort, reqRef));
 
 	addRingBuffer(reqRingBuffer);
 }
 
-shared_ptr<PcmDevice> SndFrontendHandler::createPcmDevice(StreamType type,
-														  const string& id)
+PcmDevicePtr SndFrontendHandler::createPcmDevice(StreamType type,
+												 const string& id)
 {
-	shared_ptr<PcmDevice> pcmDevice;
-
-#ifdef WITH_ALSA
-	pcmDevice.reset(new Alsa::AlsaPcm(type));
-#else
-		throw FrontendHandlerException("Alsa PCM is not supported");
-#endif
-
-#ifdef WITH_PULSE
+	string pcmType;;
+	string deviceName;
 	string propName;
 	string propValue;
 
-	pcmDevice.reset(mPulseMainloop->createStream(type, id,
-					propName, propValue));
-#else
-		throw FrontendHandlerException("Pulse PCM is not supported");
+	parseStreamId(id, pcmType, deviceName, propName, propValue);
+
+	transform(pcmType.begin(), pcmType.end(), pcmType.begin(),
+			  (int (*)(int))toupper);
+
+	PcmDevicePtr pcmDevice;
+
+	LOG(mLog, DEBUG) << "Create pcm device, type: " << pcmType
+					 << ", device: " << deviceName
+					 << ", propName: " << propName
+					 << ", propValue: " << propValue;
+
+#ifdef WITH_PULSE
+	if (pcmType == "PULSE" || pcmType.empty())
+	{
+		if (propName.empty())
+		{
+			propName = "media.role";
+		}
+
+		pcmDevice.reset(mPulseMainloop.createStream(type, id,
+													propName, propValue,
+													deviceName));
+	}
+#endif
+
+#ifdef WITH_ALSA
+	if (pcmType == "ALSA" || pcmType.empty())
+	{
+		if (deviceName.empty())
+		{
+			deviceName = "default";
+		}
+
+		pcmDevice.reset(new Alsa::AlsaPcm(type, deviceName));
+	}
 #endif
 
 	if (!pcmDevice)
 	{
-		throw FrontendHandlerException("Invalid PCM type");
+		throw FrontendHandlerException("Invalid PCM type: " + pcmType);
 	}
 
 	return pcmDevice;
+}
+
+void SndFrontendHandler::parseStreamId(const string& id,
+									   string& pcmType, string& deviceName,
+									   string& propName, string& propValue)
+{
+	LOG(mLog, DEBUG) << "Parse stream id: " << id;
+
+	string input = id;
+
+	pcmType = parsePcmType(input);
+	deviceName = parseDeviceName(input);
+	propName = parsePropName(input);
+	propValue = parsePropValue(input);
+}
+
+string SndFrontendHandler::parsePcmType(string& input)
+{
+	if (input.empty())
+	{
+		return string();
+	}
+
+	auto pos = input.find("<");
+	auto type = input.substr(0, pos);
+
+	input.erase(0, pos);
+
+	return type;
+}
+
+string SndFrontendHandler::parseDeviceName(string& input)
+{
+	if (input.empty())
+	{
+		return string();
+	}
+
+	auto pos = input.find(">");
+
+	if (pos == string::npos)
+	{
+		throw SoundException("Can't get device name from id: " + input,
+							 -EINVAL);
+	}
+
+	auto device = input.substr(1, pos - 1);
+
+	input.erase(0, ++pos);
+
+	replace(device.begin(), device.end(), ';', ',');
+
+	return device;
+}
+
+string SndFrontendHandler::parsePropName(string& input)
+{
+	if (input.empty())
+	{
+		return string();
+	}
+
+	auto pos = input.find(":");
+
+	if (pos == string::npos)
+	{
+		return input;
+	}
+
+	auto propName = input.substr(0, pos);
+
+	input.erase(0, ++pos);
+
+	return propName;
+}
+
+string SndFrontendHandler::parsePropValue(string& input)
+{
+	if (input.empty())
+	{
+		return string();
+	}
+
+	return input;
 }
 
 /*******************************************************************************

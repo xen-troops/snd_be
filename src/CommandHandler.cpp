@@ -35,7 +35,6 @@
 using std::bind;
 using std::min;
 using std::out_of_range;
-using std::shared_ptr;
 using std::vector;
 using std::unordered_map;
 
@@ -44,7 +43,7 @@ using namespace std::placeholders;
 using XenBackend::XenException;
 using XenBackend::XenGnttabBuffer;
 
-using SoundItf::PcmDevice;
+using SoundItf::PcmDevicePtr;
 using SoundItf::PcmParams;
 using SoundItf::SoundException;
 
@@ -61,7 +60,7 @@ unordered_map<int, CommandHandler::CommandFn> CommandHandler::sCmdTable =
  * CommandHandler
  ******************************************************************************/
 
-CommandHandler::CommandHandler(shared_ptr<PcmDevice> pcmDevice,
+CommandHandler::CommandHandler(PcmDevicePtr pcmDevice,
 							   EventRingBufferPtr eventRingBuffer,
 							   domid_t domId) :
 	mPcmDevice(pcmDevice),
