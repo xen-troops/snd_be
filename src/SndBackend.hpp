@@ -60,7 +60,7 @@ public:
 	 * @param ref   grant table reference
 	 */
 	StreamRingBuffer(const std::string& id,
-					 std::shared_ptr<SoundItf::PcmDevice> pcmDevice,
+					 SoundItf::PcmDevicePtr pcmDevice,
 					 EventRingBufferPtr eventRingBuffer,
 					 domid_t domId, evtchn_port_t port, grant_ref_t ref);
 
@@ -104,13 +104,21 @@ protected:
 private:
 
 #ifdef WITH_PULSE
-	std::unique_ptr<Pulse::PulseMainloop> mPulseMainloop;
+	Pulse::PulseMainloop mPulseMainloop;
 #endif
 
 	XenBackend::Log mLog;
 
-	std::shared_ptr<SoundItf::PcmDevice> createPcmDevice(
-			SoundItf::StreamType type, const std::string& id);
+	SoundItf::PcmDevicePtr createPcmDevice(SoundItf::StreamType type,
+										   const std::string& id);
+	void parseStreamId(const std::string& id,
+					   std::string& pcmType, std::string& deviceName,
+					   std::string& propName, std::string& propValue);
+	std::string parsePcmType(std::string& input);
+	std::string parseDeviceName(std::string& input);
+	std::string parsePropName(std::string& input);
+	std::string parsePropValue(std::string& input);
+
 	void createStream(const std::string& id, SoundItf::StreamType type,
 					  const std::string& streamPath);
 	void processCard(const std::string& cardPath);

@@ -22,6 +22,7 @@
 #define SRC_SOUNDITF_HPP_
 
 #include <functional>
+#include <memory>
 #include <string>
 
 #include <xen/be/Log.hpp>
@@ -159,6 +160,8 @@ public:
 	 */
 	virtual void setProgressCbk(ProgressCbk cbk) = 0;
 };
+
+typedef std::shared_ptr<PcmDevice> PcmDevicePtr;
 
 }
 
