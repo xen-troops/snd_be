@@ -229,29 +229,32 @@ void PulsePcm::open(const PcmParams& params)
 {
 	lock_guard<PulseMutex> lock(mMutex);
 
-	DLOG(mLog, DEBUG) << "Open pcm device: " << mName
-					  << ", format: " << static_cast<int>(params.format)
-					  << ", rate: " << params.rate
-					  << ", channels: " << static_cast<int>(params.numChannels);
+	LOG(mLog, DEBUG) << "Open pcm device: " << mName;
+
+	LOG(mLog, DEBUG) << "Format: "
+	  << pa_sample_format_to_string(convertPcmFormat(params.format))
+	  << ", rate: " << params.rate
+	  << ", channels: " << static_cast<int>(params.numChannels)
+	  << ", period: " << params.periodSize
+	  << ", buffer: " << params.bufferSize;
 
 	if (mStream)
 	{
 		throw Exception("PCM device " + mName + " already opened", PA_ERR_EXIST);
 	}
 
+	mParams = params;
+
 	pa_stream_direction_t streamType = mType == StreamType::PLAYBACK ?
 			PA_STREAM_PLAYBACK : PA_STREAM_RECORD;
 
-	const pa_sample_spec ss =
-	{
-		.format = convertPcmFormat(params.format),
-		.rate = params.rate,
-		.channels = params.numChannels
-	};
+	mSampleSpec.format = convertPcmFormat(params.format);
+	mSampleSpec.rate = params.rate;
+	mSampleSpec.channels = params.numChannels;
 
 	PulseProplist propList(mPropName.c_str(), mPropValue.c_str());
 
-	mStream = pa_stream_new_with_proplist(mContext, mName.c_str(), &ss,
+	mStream = pa_stream_new_with_proplist(mContext, mName.c_str(), &mSampleSpec,
 										  nullptr, &propList);
 
 	if (!mStream)
@@ -272,7 +275,7 @@ void PulsePcm::open(const PcmParams& params)
 
 	pa_buffer_attr bufferAttr;
 
-	bufferAttr.maxlength = -1;
+	bufferAttr.maxlength = mParams.bufferSize ? mParams.bufferSize : -1;
 	bufferAttr.tlength = -1;
 	bufferAttr.prebuf = 0;
 	bufferAttr.minreq = -1;
@@ -310,8 +313,9 @@ void PulsePcm::open(const PcmParams& params)
 	waitStreamReady();
 
 	timeval now;
+
 	gettimeofday(&now, nullptr);
-	pa_timeval_add(&now, 100000);
+	pa_timeval_add(&now, pa_bytes_to_usec(mParams.periodSize, &mSampleSpec));
 
 	auto api = pa_threaded_mainloop_get_api(mMainloop);
 	mTimeEvent = api->time_new(api, &now, sTimeEventCbk, this);
@@ -335,7 +339,7 @@ void PulsePcm::close()
 
 	if (mStream)
 	{
-		DLOG(mLog, DEBUG) << "Close pcm device: " << mName;
+		LOG(mLog, DEBUG) << "Close pcm device: " << mName;
 
 		// drain
 		if (mType == StreamType::PLAYBACK)
@@ -478,7 +482,7 @@ void PulsePcm::write(uint8_t* buffer, size_t size)
 
 void PulsePcm::start()
 {
-	DLOG(mLog, DEBUG) << "Start";
+	LOG(mLog, DEBUG) << "Start";
 
 	auto op = pa_stream_cork(mStream, 0, sSuccessCbk, this);
 
@@ -497,7 +501,7 @@ void PulsePcm::start()
 
 void PulsePcm::stop()
 {
-	DLOG(mLog, DEBUG) << "Stop";
+	LOG(mLog, DEBUG) << "Stop";
 
 	auto op = pa_stream_cork(mStream, 1, sSuccessCbk, this);
 
@@ -518,7 +522,7 @@ void PulsePcm::stop()
 
 void PulsePcm::pause()
 {
-	DLOG(mLog, DEBUG) << "Pause";
+	LOG(mLog, DEBUG) << "Pause";
 
 	auto op = pa_stream_cork(mStream, 1, sSuccessCbk, this);
 
@@ -537,7 +541,7 @@ void PulsePcm::pause()
 
 void PulsePcm::resume()
 {
-	DLOG(mLog, DEBUG) << "Resume";
+	LOG(mLog, DEBUG) << "Resume";
 
 	auto op = pa_stream_cork(mStream, 0, sSuccessCbk, this);
 
@@ -643,7 +647,8 @@ void PulsePcm::timeEventCbk(pa_mainloop_api *api, pa_time_event *timeEvent,
 	timeval now;
 
 	gettimeofday(&now, nullptr);
-	pa_timeval_add(&now, 100000);
+	pa_timeval_add(&now, pa_bytes_to_usec(mParams.periodSize, &mSampleSpec));
+
 	api->time_restart(timeEvent, &now);
 }
 
@@ -653,11 +658,14 @@ void PulsePcm::updateTimingCbk(int success)
 
 	pa_stream_get_time(mStream, &time);
 
-	LOG(mLog, DEBUG) << "Update timing, usec: " << time / 1000;
+	auto bytes = pa_usec_to_bytes(time, &mSampleSpec);
+
+	DLOG(mLog, DEBUG) << "Update timing, usec: " << time / 1000
+					  << ", bytes: " << bytes;
 
 	if (mProgressCbk)
 	{
-		mProgressCbk(time);
+		mProgressCbk(bytes);
 	}
 }
 
