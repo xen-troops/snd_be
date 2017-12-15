@@ -24,6 +24,8 @@
 
 #include <errno.h>
 
+#include <xen/be/Exception.hpp>
+
 #ifdef WITH_ALSA
 #include "AlsaPcm.hpp"
 #endif
@@ -40,12 +42,10 @@ using std::unordered_map;
 
 using namespace std::placeholders;
 
-using XenBackend::XenException;
 using XenBackend::XenGnttabBuffer;
 
 using SoundItf::PcmDevicePtr;
 using SoundItf::PcmParams;
-using SoundItf::SoundException;
 
 unordered_map<int, CommandHandler::CommandFn> CommandHandler::sCmdTable =
 {
@@ -91,17 +91,31 @@ int CommandHandler::processCommand(const xensnd_req& req)
 	{
 		(this->*sCmdTable.at(req.operation))(req);
 	}
-	catch(const out_of_range& e)
+	catch(const XenBackend::Exception& e)
+	{
+		LOG(mLog, ERROR) << e.what();
+
+		status = -e.getErrno();
+
+		if (status >= 0)
+		{
+			DLOG(mLog, WARNING) << "Positive error code: "
+								<< static_cast<signed int>(status);
+
+			status = -EINVAL;
+		}
+	}
+	catch(const std::out_of_range& e)
 	{
 		LOG(mLog, ERROR) << e.what();
 
 		status = -EINVAL;
 	}
-	catch(const SoundException& e)
+	catch(const std::exception& e)
 	{
 		LOG(mLog, ERROR) << e.what();
 
-		status = e.getErrno();
+		status = -EIO;
 	}
 
 	DLOG(mLog, DEBUG) << "Return status: [" << status << "]";
@@ -191,7 +205,7 @@ void CommandHandler::trigger(const xensnd_req& req)
 		mPcmDevice->resume();
 		break;
 	default:
-		throw SoundException("Unknown trigger type", -EINVAL);
+		throw XenBackend::Exception("Unknown trigger type", -EINVAL);
 	}
 }
 
