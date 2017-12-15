@@ -253,6 +253,11 @@ void AlsaPcm::stop()
 		throw Exception("Can't stop device " + mDeviceName, -ret);
 	}
 
+	if ((ret = snd_pcm_prepare(mHandle)) < 0)
+	{
+		throw Exception("Can't prepare audio interface for use", -ret);
+	}
+
 	mTimer.stop();
 }
 
