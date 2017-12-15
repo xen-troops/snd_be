@@ -230,6 +230,8 @@ private:
 	const void* mReadData;
 	size_t mReadIndex;
 	size_t mReadLength;
+	pa_sample_spec mSampleSpec;
+	SoundItf::PcmParams mParams;
 
 	XenBackend::Log mLog;
 
