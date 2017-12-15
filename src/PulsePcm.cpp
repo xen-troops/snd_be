@@ -29,16 +29,13 @@ using std::string;
 using std::to_string;
 
 using SoundItf::PcmParams;
-using SoundItf::SoundException;
 using SoundItf::StreamType;
 
 namespace Pulse {
 
-void contextError(pa_context* context)
+void contextError(const string& message, pa_context* context)
 {
-	int error = pa_context_errno(context);
-
-	throw SoundException(string("Pulse error: ") + pa_strerror(error), -error);
+	throw Exception(message, pa_context_errno(context));
 }
 
 /*******************************************************************************
@@ -55,7 +52,7 @@ PulseMainloop::PulseMainloop(const string& name) :
 	{
 		init(name);
 	}
-	catch(const SoundException& e)
+	catch(const std::exception& e)
 	{
 		release();
 
@@ -120,7 +117,7 @@ void PulseMainloop::waitContextReady()
 
 		if (!PA_CONTEXT_IS_GOOD(state))
 		{
-			contextError(mContext);
+			contextError("Can't wait context ready", mContext);
 		}
 
 		pa_threaded_mainloop_wait(mMainloop);
@@ -137,7 +134,7 @@ void PulseMainloop::init(const string& name)
 
 	if (!mMainloop)
 	{
-		throw SoundException("Can't create Pulse mainloop", -PA_ERR_UNKNOWN);
+		throw Exception("Can't create Pulse mainloop", PA_ERR_UNKNOWN);
 	}
 
 	mMutex = PulseMutex(mMainloop);
@@ -146,28 +143,28 @@ void PulseMainloop::init(const string& name)
 
 	if (!api)
 	{
-		throw SoundException("Can't get Pulse API", -PA_ERR_UNKNOWN);
+		throw Exception("Can't get Pulse API", PA_ERR_UNKNOWN);
 	}
 
 	mContext = pa_context_new(api, name.c_str());
 
 	if (!mContext)
 	{
-		throw SoundException("Can't create Pulse context", -PA_ERR_UNKNOWN);
+		throw Exception("Can't create Pulse context", PA_ERR_UNKNOWN);
 	}
 
 	pa_context_set_state_callback(mContext, sContextStateChanged, this);
 
 	if (pa_context_connect(mContext, nullptr, PA_CONTEXT_NOFLAGS, nullptr) < 0)
 	{
-		contextError(mContext);
+		contextError("Can't connect context", mContext);
 	}
 
 	lock_guard<PulseMutex> lock(mMutex);
 
 	if (pa_threaded_mainloop_start(mMainloop) < 0)
 	{
-		throw SoundException("Can't start Pulse mainloop", -PA_ERR_UNKNOWN);
+		throw Exception("Can't start Pulse mainloop", PA_ERR_UNKNOWN);
 	}
 
 	waitContextReady();
@@ -239,8 +236,7 @@ void PulsePcm::open(const PcmParams& params)
 
 	if (mStream)
 	{
-		throw SoundException("PCM device " + mName + " already opened",
-							 -PA_ERR_EXIST);
+		throw Exception("PCM device " + mName + " already opened", PA_ERR_EXIST);
 	}
 
 	pa_stream_direction_t streamType = mType == StreamType::PLAYBACK ?
@@ -260,7 +256,7 @@ void PulsePcm::open(const PcmParams& params)
 
 	if (!mStream)
 	{
-		throw SoundException("Can't open PCM device " + mName, -PA_ERR_UNKNOWN);
+		throw Exception("Can't open PCM device " + mName, PA_ERR_UNKNOWN);
 	}
 
 	pa_stream_set_state_callback(mStream, sStreamStateChanged, this);
@@ -299,7 +295,7 @@ void PulsePcm::open(const PcmParams& params)
 
 	if (ret < 0)
 	{
-		contextError(mContext);
+		contextError(string("Can't connect to device: ") + deviceName, mContext);
 	}
 
 	waitStreamReady();
@@ -313,7 +309,7 @@ void PulsePcm::open(const PcmParams& params)
 
 	if (!mTimeEvent)
 	{
-		throw SoundException("Can't create time event " + mName, -PA_ERR_UNKNOWN);
+		throw Exception("Can't create time event " + mName, PA_ERR_UNKNOWN);
 	}
 }
 
@@ -353,12 +349,12 @@ void PulsePcm::read(uint8_t* buffer, size_t size)
 
 	if (mType != StreamType::CAPTURE)
 	{
-		throw SoundException(pa_strerror(PA_ERR_BADSTATE), -PA_ERR_BADSTATE);
+		throw Exception("Wrong stream type", PA_ERR_BADSTATE);
 	}
 
 	if (!buffer || !size)
 	{
-		throw SoundException(pa_strerror(PA_ERR_INVALID), -PA_ERR_INVALID);
+		throw Exception("Can't read stream", PA_ERR_INVALID);
 	}
 
 	lock_guard<PulseMutex> lock(mMutex);
@@ -371,7 +367,7 @@ void PulsePcm::read(uint8_t* buffer, size_t size)
 		{
 			if (pa_stream_peek(mStream, &mReadData, &mReadLength) < 0)
 			{
-				contextError(mContext);
+				contextError("Can't peek stream", mContext);
 			}
 
 			if (mReadLength <= 0)
@@ -384,7 +380,7 @@ void PulsePcm::read(uint8_t* buffer, size_t size)
 			{
 				if (pa_stream_drop(mStream) < 0)
 				{
-					contextError(mContext);
+					contextError("Can't drop stream", mContext);
 				}
 			} else
 			{
@@ -411,7 +407,7 @@ void PulsePcm::read(uint8_t* buffer, size_t size)
 
 			if (pa_stream_drop(mStream) < 0)
 			{
-				contextError(mContext);
+				contextError("Can't drop stream", mContext);
 			}
 		}
 	}
@@ -424,12 +420,12 @@ void PulsePcm::write(uint8_t* buffer, size_t size)
 
 	if (mType != StreamType::PLAYBACK)
 	{
-		throw SoundException(pa_strerror(PA_ERR_BADSTATE), -PA_ERR_BADSTATE);
+		throw Exception("Wrong stream type", PA_ERR_BADSTATE);
 	}
 
 	if (!buffer || !size)
 	{
-		throw SoundException(pa_strerror(PA_ERR_INVALID), -PA_ERR_INVALID);
+		throw Exception("Can't write stream", PA_ERR_INVALID);
 	}
 
 	lock_guard<PulseMutex> lock(mMutex);
@@ -449,7 +445,7 @@ void PulsePcm::write(uint8_t* buffer, size_t size)
 
 		if (writableSize == static_cast<size_t>(-1))
 		{
-			contextError(mContext);
+			contextError("Can't write stream", mContext);
 		}
 
 		if (writableSize > size)
@@ -460,7 +456,7 @@ void PulsePcm::write(uint8_t* buffer, size_t size)
 		if (pa_stream_write(mStream, buffer, writableSize, nullptr,
 							0LL, PA_SEEK_RELATIVE) < 0)
 		{
-			contextError(mContext);
+			contextError("Can't write stream", mContext);
 		}
 
 		buffer = buffer + writableSize;
@@ -606,7 +602,7 @@ void PulsePcm::waitStreamReady()
 
 		if (!PA_STREAM_IS_GOOD(state))
 		{
-			contextError(mContext);
+			contextError("Can't wait stream ready", mContext);
 		}
 
 		pa_threaded_mainloop_wait(mMainloop);
@@ -668,7 +664,7 @@ void PulsePcm::checkStatus()
 
 	if (error != PA_OK)
 	{
-		throw SoundException(pa_strerror(error), -error);
+		throw Exception("Stream error", error);
 	}
 }
 
@@ -697,7 +693,7 @@ pa_sample_format_t PulsePcm::convertPcmFormat(uint8_t format)
 		}
 	}
 
-	throw SoundException("Can't convert format", -PA_ERR_INVALID);
+	throw Exception("Can't convert format", PA_ERR_INVALID);
 }
 
 }

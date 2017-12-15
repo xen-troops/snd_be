@@ -28,7 +28,6 @@ using std::string;
 using std::to_string;
 
 using SoundItf::PcmParams;
-using SoundItf::SoundException;
 using SoundItf::StreamType;
 
 namespace Alsa {
@@ -80,8 +79,7 @@ void AlsaPcm::open(const PcmParams& params)
 		if ((ret = snd_pcm_open(&mHandle, mDeviceName.c_str(),
 							    streamType, 0)) < 0)
 		{
-			throw SoundException("Can't open audio device " + mDeviceName,
-								 ret);
+			throw Exception("Can't open audio device " + mDeviceName, -ret);
 		}
 
 		setHwParams(params);
@@ -89,14 +87,13 @@ void AlsaPcm::open(const PcmParams& params)
 
 		if ((ret = snd_pcm_prepare(mHandle)) < 0)
 		{
-			throw SoundException(
-					"Can't prepare audio interface for use", ret);
+			throw Exception("Can't prepare audio interface for use", -ret);
 		}
 
 		mFrameWritten = 0;
 		mFrameUnderrun = 0;
 	}
-	catch(const SoundException& e)
+	catch(const std::exception& e)
 	{
 		close();
 
@@ -127,9 +124,7 @@ void AlsaPcm::read(uint8_t* buffer, size_t size)
 
 	if (!mHandle)
 	{
-		throw SoundException("Alsa device is not opened: " +
-							 mDeviceName + ". Error: " +
-							 snd_strerror(-EFAULT), -EFAULT);
+		throw Exception("Alsa device is not opened: " + mDeviceName, EFAULT);
 	}
 
 	auto numFrames = snd_pcm_bytes_to_frames(mHandle, size);
@@ -147,9 +142,8 @@ void AlsaPcm::read(uint8_t* buffer, size_t size)
 			}
 			else if (status < 0)
 			{
-				throw SoundException("Read from audio interface failed: " +
-									 mDeviceName + ". Error: " +
-									 snd_strerror(status), status);
+				throw Exception("Read from audio interface failed: " +
+								 mDeviceName, -status);
 			}
 			else
 			{
@@ -164,9 +158,7 @@ void AlsaPcm::write(uint8_t* buffer, size_t size)
 {
 	if (!mHandle)
 	{
-		throw SoundException("Alsa device is not opened: " +
-							 mDeviceName + ". Error: " +
-							 snd_strerror(-EFAULT), -EFAULT);
+		throw Exception("Alsa device is not opened: " + mDeviceName, EFAULT);
 	}
 
 	auto numFrames = snd_pcm_bytes_to_frames(mHandle, size);
@@ -188,9 +180,8 @@ void AlsaPcm::write(uint8_t* buffer, size_t size)
 
 				if ((status = snd_pcm_recover(mHandle, status, 0)) < 0)
 				{
-					throw SoundException("Can't recover underrun: " +
-										 mDeviceName + ". Error: " +
-										 snd_strerror(status), status);
+					throw Exception("Can't recover underrun: " + mDeviceName,
+									-status);
 				}
 
 				mFrameUnderrun = mFrameWritten;
@@ -199,9 +190,8 @@ void AlsaPcm::write(uint8_t* buffer, size_t size)
 			}
 			else if (status < 0)
 			{
-				throw SoundException("Write to audio interface failed: " +
-									 mDeviceName + ". Error: " +
-									 snd_strerror(status), status);
+				throw Exception("Write to audio interface failed: " +
+								mDeviceName, -status);
 			}
 			else
 			{
@@ -209,15 +199,15 @@ void AlsaPcm::write(uint8_t* buffer, size_t size)
 				buffer = &buffer[snd_pcm_frames_to_bytes(mHandle, status)];
 				mFrameWritten += status;
 
-				if (snd_pcm_state(mHandle) != SND_PCM_STATE_RUNNING && restartAfterError)
+				if (snd_pcm_state(mHandle) != SND_PCM_STATE_RUNNING &&
+					restartAfterError)
 				{
 					restartAfterError = false;
 
 					if ((status = snd_pcm_start(mHandle)) < 0)
 					{
-						throw SoundException("Can't recover underrun: " +
-											 mDeviceName + ". Error: " +
-											 snd_strerror(status), status);
+						throw Exception("Can't recover underrun: " +
+										mDeviceName, -status);
 					}
 				}
 			}
@@ -232,16 +222,15 @@ void AlsaPcm::start()
 
 	if (!mHandle)
 	{
-		throw SoundException("Alsa device is not opened: " +
-							 mDeviceName + ". Error: " +
-							 snd_strerror(-EFAULT), -EFAULT);
+		throw Exception("Alsa device is not opened: " +
+						 mDeviceName , EFAULT);
 	}
 
 	int ret = 0;
 
 	if ((ret = snd_pcm_start(mHandle)) < 0)
 	{
-		throw SoundException("Can't start device " + mDeviceName, ret);
+		throw Exception("Can't start device " + mDeviceName, -ret);
 	}
 
 	mTimer.start();
@@ -253,16 +242,15 @@ void AlsaPcm::stop()
 
 	if (!mHandle)
 	{
-		throw SoundException("Alsa device is not opened: " +
-							 mDeviceName + ". Error: " +
-							 snd_strerror(-EFAULT), -EFAULT);
+		throw Exception("Alsa device is not opened: " +
+						 mDeviceName, EFAULT);
 	}
 
 	int ret = 0;
 
 	if ((ret = snd_pcm_drop(mHandle)) < 0)
 	{
-		throw SoundException("Can't stop device " + mDeviceName, ret);
+		throw Exception("Can't stop device " + mDeviceName, -ret);
 	}
 
 	mTimer.stop();
@@ -274,16 +262,15 @@ void AlsaPcm::pause()
 
 	if (!mHandle)
 	{
-		throw SoundException("Alsa device is not opened: " +
-							 mDeviceName + ". Error: " +
-							 snd_strerror(-EFAULT), -EFAULT);
+		throw Exception("Alsa device is not opened: " +
+						 mDeviceName, EFAULT);
 	}
 
 	int ret = 0;
 
 	if ((ret = snd_pcm_pause(mHandle, 1)) < 0)
 	{
-		throw SoundException("Can't pause device " + mDeviceName, ret);
+		throw Exception("Can't pause device " + mDeviceName, -ret);
 	}
 }
 
@@ -293,16 +280,15 @@ void AlsaPcm::resume()
 
 	if (!mHandle)
 	{
-		throw SoundException("Alsa device is not opened: " +
-							 mDeviceName + ". Error: " +
-							 snd_strerror(-EFAULT), -EFAULT);
+		throw Exception("Alsa device is not opened: " +
+						 mDeviceName, EFAULT);
 	}
 
 	int ret = 0;
 
 	if ((ret = snd_pcm_pause(mHandle, 0)) < 0)
 	{
-		throw SoundException("Can't resume device " + mDeviceName, ret);
+		throw Exception("Can't resume device " + mDeviceName, -ret);
 	}
 }
 
@@ -321,24 +307,24 @@ void AlsaPcm::setHwParams(const PcmParams& params)
 								  params.numChannels, params.rate, 0,
 								  500000)) < 0)
 	{
-		throw SoundException("Can't set hw params " + mDeviceName, ret);
+		throw Exception("Can't set hw params " + mDeviceName, -ret);
 	}
 
 	snd_pcm_hw_params_alloca(&hwParams);
 
 	if ((ret = snd_pcm_hw_params_current(mHandle, hwParams)) < 0)
 	{
-		throw SoundException("Can't get current hw params " + mDeviceName, ret);
+		throw Exception("Can't get current hw params " + mDeviceName, -ret);
 	}
 
 	if ((ret = snd_pcm_hw_params_get_rate(hwParams, &mRate, 0)) < 0)
 	{
-		throw SoundException("Can't get rate " + mDeviceName, ret);
+		throw Exception("Can't get rate " + mDeviceName, -ret);
 	}
 
 	if ((ret = snd_pcm_hw_params_get_buffer_size(hwParams, &mBufferSize)) < 0)
 	{
-		throw SoundException("Can't get buffer size " + mDeviceName, ret);
+		throw Exception("Can't get buffer size " + mDeviceName, -ret);
 	}
 
 	LOG(mLog, DEBUG) << "Rate: " << mRate << ", buffer size: " << mBufferSize;
@@ -367,30 +353,30 @@ void AlsaPcm::setSwParams()
 
 	if ((ret = snd_pcm_sw_params_current(mHandle, swParams)) < 0)
 	{
-		throw SoundException("Can't get swParams " + mDeviceName, ret);
+		throw Exception("Can't get swParams " + mDeviceName, -ret);
 	}
 
 	if ((ret = snd_pcm_sw_params_set_tstamp_mode(
 			mHandle, swParams, SND_PCM_TSTAMP_ENABLE)) < 0)
 	{
-		throw SoundException("Can't set ts mode " + mDeviceName, ret);
+		throw Exception("Can't set ts mode " + mDeviceName, -ret);
 	}
 
 	if ((ret = snd_pcm_sw_params_set_tstamp_type(
 			mHandle, swParams, SND_PCM_TSTAMP_TYPE_MONOTONIC_RAW)) < 0)
 	{
-		throw SoundException("Can't set ts type " + mDeviceName, ret);
+		throw Exception("Can't set ts type " + mDeviceName, -ret);
 	}
 
 	if ((ret = snd_pcm_sw_params_set_start_threshold(mHandle, swParams,
 													 mBufferSize * 2)) < 0)
 	{
-		throw SoundException("Can't set start threshold " + mDeviceName, ret);
+		throw Exception("Can't set start threshold " + mDeviceName, -ret);
 	}
 
 	if ((ret = snd_pcm_sw_params(mHandle, swParams)) < 0)
 	{
-		throw SoundException("Can't set swParams " + mDeviceName, ret);
+		throw Exception("Can't set swParams " + mDeviceName, -ret);
 	}
 }
 
@@ -476,7 +462,7 @@ snd_pcm_format_t AlsaPcm::convertPcmFormat(uint8_t format)
 		}
 	}
 
-	throw SoundException("Can't convert format", -EINVAL);
+	throw Exception("Can't convert format", EINVAL);
 }
 
 }

@@ -66,7 +66,6 @@ using XenBackend::RingBufferInBase;
 using XenBackend::Utils;
 using XenBackend::XenStore;
 
-using SoundItf::SoundException;
 using SoundItf::StreamType;
 using SoundItf::PcmDevicePtr;
 using SoundItf::PcmType;
@@ -254,7 +253,7 @@ PcmDevicePtr SndFrontendHandler::createPcmDevice(StreamType type,
 
 	if (!pcmDevice)
 	{
-		throw FrontendHandlerException("Invalid PCM type: " + pcmType);
+		throw FrontendHandlerException("Invalid PCM type: " + pcmType, EINVAL);
 	}
 
 	return pcmDevice;
@@ -300,8 +299,8 @@ string SndFrontendHandler::parseDeviceName(string& input)
 
 	if (pos == string::npos)
 	{
-		throw SoundException("Can't get device name from id: " + input,
-							 -EINVAL);
+		throw FrontendHandlerException("Can't get device name from id: " + input,
+									   EINVAL);
 	}
 
 	auto device = input.substr(1, pos - 1);
