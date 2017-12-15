@@ -270,13 +270,22 @@ void PulsePcm::open(const PcmParams& params)
 
 	int ret = 0;
 
+	pa_buffer_attr bufferAttr;
+
+	bufferAttr.maxlength = -1;
+	bufferAttr.tlength = -1;
+	bufferAttr.prebuf = 0;
+	bufferAttr.minreq = -1;
+	bufferAttr.fragsize = -1;
+
 	if (streamType == PA_STREAM_PLAYBACK)
 	{
 		pa_stream_set_write_callback(mStream, sStreamRequest, this);
 		pa_stream_set_latency_update_callback(mStream, sLatencyUpdate, this);
 
-		ret = pa_stream_connect_playback(mStream, deviceName, nullptr,
+		ret = pa_stream_connect_playback(mStream, deviceName, &bufferAttr,
 										 static_cast<pa_stream_flags_t>(
+										 PA_STREAM_START_CORKED |
 										 PA_STREAM_INTERPOLATE_TIMING |
 										 PA_STREAM_ADJUST_LATENCY |
 										 PA_STREAM_AUTO_TIMING_UPDATE),
@@ -320,6 +329,8 @@ void PulsePcm::close()
 	if (mTimeEvent)
 	{
 		pa_threaded_mainloop_get_api(mMainloop)->time_free(mTimeEvent);
+
+		mTimeEvent = nullptr;
 	}
 
 	if (mStream)
@@ -329,7 +340,7 @@ void PulsePcm::close()
 		// drain
 		if (mType == StreamType::PLAYBACK)
 		{
-			drain();
+			flush();
 		}
 
 		pa_stream_disconnect(mStream);
@@ -467,22 +478,80 @@ void PulsePcm::write(uint8_t* buffer, size_t size)
 
 void PulsePcm::start()
 {
+	DLOG(mLog, DEBUG) << "Start";
 
+	auto op = pa_stream_cork(mStream, 0, sSuccessCbk, this);
+
+	if (!op)
+	{
+		contextError("Can't start stream", mContext);
+	}
+
+	if (!waitOperationFinished(op))
+	{
+		contextError("Can't start stream", mContext);
+	}
+
+	pa_operation_unref(op);
 }
 
 void PulsePcm::stop()
 {
+	DLOG(mLog, DEBUG) << "Stop";
 
+	auto op = pa_stream_cork(mStream, 1, sSuccessCbk, this);
+
+	if (!op)
+	{
+		contextError("Can't stop stream", mContext);
+	}
+
+	if (!waitOperationFinished(op))
+	{
+		contextError("Can't stop stream", mContext);
+	}
+
+	pa_operation_unref(op);
+
+	flush();
 }
 
 void PulsePcm::pause()
 {
+	DLOG(mLog, DEBUG) << "Pause";
 
+	auto op = pa_stream_cork(mStream, 1, sSuccessCbk, this);
+
+	if (!op)
+	{
+		contextError("Can't pause stream", mContext);
+	}
+
+	if (!waitOperationFinished(op))
+	{
+		contextError("Can't pause stream", mContext);
+	}
+
+	pa_operation_unref(op);
 }
 
 void PulsePcm::resume()
 {
+	DLOG(mLog, DEBUG) << "Resume";
 
+	auto op = pa_stream_cork(mStream, 0, sSuccessCbk, this);
+
+	if (!op)
+	{
+		contextError("Can't resume stream", mContext);
+	}
+
+	if (!waitOperationFinished(op))
+	{
+		contextError("Can't resume stream", mContext);
+	}
+
+	pa_operation_unref(op);
 }
 
 /*******************************************************************************
@@ -509,7 +578,8 @@ void PulsePcm::sSuccessCbk(pa_stream* stream, int success, void *data)
 	static_cast<PulsePcm*>(data)->successCbk(success);
 }
 
-void PulsePcm::sTimeEventCbk(pa_mainloop_api *api, pa_time_event *timeEvent, const struct timeval *tv, void *data)
+void PulsePcm::sTimeEventCbk(pa_mainloop_api *api, pa_time_event *timeEvent,
+							 const struct timeval *tv, void *data)
 {
 	static_cast<PulsePcm*>(data)->timeEventCbk(api, timeEvent, tv);
 }
@@ -553,11 +623,12 @@ void PulsePcm::successCbk(int success)
 	pa_threaded_mainloop_signal(mMainloop, 0);
 }
 
-void PulsePcm::timeEventCbk(pa_mainloop_api *api, pa_time_event *timeEvent, const struct timeval *tv)
+void PulsePcm::timeEventCbk(pa_mainloop_api *api, pa_time_event *timeEvent,
+							const struct timeval *tv)
 {
 	if (mStream && pa_stream_get_state(mStream) == PA_STREAM_READY)
 	{
-		pa_operation *op = pa_stream_update_timing_info(mStream, sUpdateTimingCbk, this);
+		auto op = pa_stream_update_timing_info(mStream, sUpdateTimingCbk, this);
 
 		if (!op)
 		{
@@ -580,13 +651,14 @@ void PulsePcm::updateTimingCbk(int success)
 {
 	pa_usec_t time;
 
-	const pa_timing_info* info = pa_stream_get_timing_info(mStream);
-
-
 	pa_stream_get_time(mStream, &time);
 
-	LOG(mLog, DEBUG) << "Update timing: " << time / 1000;
-	LOG(mLog, DEBUG) << "Update info: " << info->timestamp.tv_sec;
+	LOG(mLog, DEBUG) << "Update timing, usec: " << time / 1000;
+
+	if (mProgressCbk)
+	{
+		mProgressCbk(time);
+	}
 }
 
 void PulsePcm::waitStreamReady()
@@ -609,9 +681,9 @@ void PulsePcm::waitStreamReady()
 	}
 }
 
-void PulsePcm::drain()
+void PulsePcm::flush()
 {
-	auto op = pa_stream_drain(mStream, sSuccessCbk, this);
+	auto op = pa_stream_flush(mStream, sSuccessCbk, this);
 
 	if (op)
 	{

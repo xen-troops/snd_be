@@ -81,7 +81,8 @@ public:
 
 	PulseProplist() { mProplist = pa_proplist_new(); }
 
-	PulseProplist(const std::string& name, const std::string& value) : PulseProplist()
+	PulseProplist(const std::string& name, const std::string& value) :
+		PulseProplist()
     {
         set(name, value);
     }
@@ -201,7 +202,9 @@ public:
 	 * @param cbk callback
 	 */
 	void setProgressCbk(SoundItf::ProgressCbk cbk) override
-	{ mProgressCbk = cbk; }
+	{
+		mProgressCbk = cbk;
+	}
 
 private:
 
@@ -236,18 +239,20 @@ private:
 	static void sStreamRequest(pa_stream *stream, size_t nbytes, void *data);
 	static void sLatencyUpdate(pa_stream *stream, void *data);
 	static void sSuccessCbk(pa_stream* stream, int success, void *data);
-	static void sTimeEventCbk(pa_mainloop_api *api, pa_time_event *timeEvent, const struct timeval *tv, void *data);
+	static void sTimeEventCbk(pa_mainloop_api *api, pa_time_event *timeEvent,
+							  const struct timeval *tv, void *data);
 	static void sUpdateTimingCbk(pa_stream *stream, int success, void *data);
 
 	void streamStateChanged();
 	void streamRequest(size_t nbytes);
 	void latencyUpdate();
 	void successCbk(int success);
-	void timeEventCbk(pa_mainloop_api *api, pa_time_event *timeEvent, const struct timeval *tv);
+	void timeEventCbk(pa_mainloop_api *api, pa_time_event *timeEvent,
+					  const struct timeval *tv);
 	void updateTimingCbk(int success);
 
 	void waitStreamReady();
-	void drain();
+	void flush();
 	int waitOperationFinished(pa_operation* op);
 	int getStatus();
 	void checkStatus();
