@@ -150,7 +150,8 @@ void CommandHandler::open(const xensnd_req& req)
 									  PROT_READ | PROT_WRITE));
 
 	mPcmDevice->open( {openReq.pcm_rate, openReq.pcm_format,
-					   openReq.pcm_channels } );
+					   openReq.pcm_channels, openReq.buffer_sz,
+					   openReq.period_sz } );
 }
 
 void CommandHandler::close(const xensnd_req& req)
