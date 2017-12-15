@@ -58,17 +58,11 @@ typedef std::function<void(uint64_t bytes)> ProgressCbk;
  ******************************************************************************/
 struct PcmParams
 {
-	/**
-	 * @param f pcm format
-	 * @param r rate
-	 * @param c number of channels
-	 */
-
 	uint32_t	rate;			//!< rate in Hz
 	uint8_t		format;			//!< pcm format
 	uint8_t		numChannels;	//!< number of channels
-	uint32_t	bufferSize;
-	uint32_t	periodSize;
+	uint32_t	bufferSize;		//!< buffer size
+	uint32_t	periodSize;		//!< period size
 };
 
 /***************************************************************************//**

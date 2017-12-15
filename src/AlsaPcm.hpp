@@ -117,9 +117,14 @@ public:
 	 * @param cbk callback
 	 */
 	void setProgressCbk(SoundItf::ProgressCbk cbk) override
-	{ mProgressCbk = cbk; }
+	{
+		mProgressCbk = cbk;
+	}
 
 private:
+
+	const snd_pcm_uframes_t cDefaultPeriodFrames = 4096;
+	const snd_pcm_uframes_t cDefaultBufferFrames = 16384;
 
 	struct PcmFormat
 	{
@@ -135,10 +140,9 @@ private:
 	XenBackend::Timer mTimer;
 	XenBackend::Log mLog;
 
-	SoundItf::ProgressCbk mProgressCbk;
-	unsigned int mRate;
+	SoundItf::PcmParams mParams;
 
-	snd_pcm_uframes_t mBufferSize;
+	SoundItf::ProgressCbk mProgressCbk;
 	snd_pcm_uframes_t mFrameWritten;
 	snd_pcm_uframes_t mFrameUnderrun;
 

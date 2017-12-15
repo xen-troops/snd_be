@@ -40,7 +40,7 @@ AlsaPcm::AlsaPcm(StreamType type, const std::string& deviceName) :
 	mHandle(nullptr),
 	mDeviceName(deviceName),
 	mType(type),
-	mTimer(bind(&AlsaPcm::getTimeStamp, this), milliseconds(10), true),
+	mTimer(bind(&AlsaPcm::getTimeStamp, this), true),
 	mLog("AlsaPcm")
 {
 	if (mDeviceName.empty())
@@ -66,10 +66,7 @@ void AlsaPcm::open(const PcmParams& params)
 {
 	try
 	{
-		DLOG(mLog, DEBUG) << "Open pcm device: " << mDeviceName
-						  << ", format: " << static_cast<int>(params.format)
-						  << ", rate: " << params.rate
-						  << ", channels: " << static_cast<int>(params.numChannels);
+		DLOG(mLog, DEBUG) << "Open pcm device: " << mDeviceName;
 
 		snd_pcm_stream_t streamType = mType == StreamType::PLAYBACK ?
 				SND_PCM_STREAM_PLAYBACK : SND_PCM_STREAM_CAPTURE;
@@ -215,7 +212,6 @@ void AlsaPcm::write(uint8_t* buffer, size_t size)
 	}
 }
 
-
 void AlsaPcm::start()
 {
 	LOG(mLog, DEBUG) << "Start";
@@ -233,7 +229,11 @@ void AlsaPcm::start()
 		throw Exception("Can't start device " + mDeviceName, -ret);
 	}
 
-	mTimer.start();
+	auto time =
+			(snd_pcm_bytes_to_frames(mHandle, mParams.periodSize) * 1000) /
+			mParams.rate;
+
+	mTimer.start(milliseconds(time));
 }
 
 void AlsaPcm::stop()
@@ -303,36 +303,104 @@ void AlsaPcm::resume()
 
 void AlsaPcm::setHwParams(const PcmParams& params)
 {
+	LOG(mLog, DEBUG) << "Format: "
+	  << snd_pcm_format_name(convertPcmFormat(params.format))
+	  << ", rate: " << params.rate
+	  << ", channels: " << static_cast<int>(params.numChannels)
+	  << ", period: " << params.periodSize
+	  << ", buffer: " << params.bufferSize;
+
 	snd_pcm_hw_params_t *hwParams = nullptr;
 
 	int ret = 0;
 
-	if ((ret = snd_pcm_set_params(mHandle, convertPcmFormat(params.format),
-								  SND_PCM_ACCESS_RW_INTERLEAVED,
-								  params.numChannels, params.rate, 0,
-								  500000)) < 0)
-	{
-		throw Exception("Can't set hw params " + mDeviceName, -ret);
-	}
+	mParams = params;
 
 	snd_pcm_hw_params_alloca(&hwParams);
 
-	if ((ret = snd_pcm_hw_params_current(mHandle, hwParams)) < 0)
+	if ((ret = snd_pcm_hw_params_any(mHandle, hwParams)) < 0)
 	{
-		throw Exception("Can't get current hw params " + mDeviceName, -ret);
+		throw Exception("Can't fill hw params " + mDeviceName, -ret);
 	}
 
-	if ((ret = snd_pcm_hw_params_get_rate(hwParams, &mRate, 0)) < 0)
+	if ((ret = snd_pcm_hw_params_set_access(
+			mHandle, hwParams, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0)
 	{
-		throw Exception("Can't get rate " + mDeviceName, -ret);
+		throw Exception("Can't set access " + mDeviceName, -ret);
 	}
 
-	if ((ret = snd_pcm_hw_params_get_buffer_size(hwParams, &mBufferSize)) < 0)
+	snd_pcm_format_t format = convertPcmFormat(params.format);
+
+	if ((ret = snd_pcm_hw_params_set_format(
+			mHandle, hwParams, format)) < 0)
 	{
-		throw Exception("Can't get buffer size " + mDeviceName, -ret);
+		throw Exception("Can't set format " + mDeviceName, -ret);
 	}
 
-	LOG(mLog, DEBUG) << "Rate: " << mRate << ", buffer size: " << mBufferSize;
+	if ((ret = snd_pcm_hw_params_set_rate(
+			mHandle, hwParams, params.rate, 0)) < 0)
+	{
+		throw Exception("Can't set rate " + mDeviceName, -ret);
+	}
+
+	if ((ret = snd_pcm_hw_params_set_channels(
+			mHandle, hwParams, params.numChannels)) < 0)
+	{
+		throw Exception("Can't set num channels " + mDeviceName, -ret);
+	}
+
+	snd_pcm_uframes_t bufferFrames = cDefaultBufferFrames;
+
+	if (params.bufferSize)
+	{
+		bufferFrames = params.bufferSize /
+					   (params.numChannels  * snd_pcm_format_size(format, 1));
+	}
+
+	if ((ret = snd_pcm_hw_params_set_buffer_size_near(
+			mHandle, hwParams, &bufferFrames)) < 0)
+	{
+		throw Exception("Can't set buffer size " + mDeviceName, -ret);
+	}
+
+	mParams.bufferSize = bufferFrames *
+						 (params.numChannels  * snd_pcm_format_size(format, 1));
+
+	if (params.bufferSize && params.bufferSize != mParams.bufferSize)
+	{
+		LOG(mLog, WARNING) << "Can't set requested buffer size. "
+						   << "Nearest value will be used: "
+						   << mParams.bufferSize;
+	}
+
+	snd_pcm_uframes_t periodFrames = cDefaultPeriodFrames;
+
+	if (params.periodSize)
+	{
+		periodFrames = params.periodSize /
+					   (params.numChannels  * snd_pcm_format_size(format, 1));
+	}
+
+	if ((ret = snd_pcm_hw_params_set_period_size_near(
+			mHandle, hwParams, &periodFrames, 0)) < 0)
+	{
+		throw Exception("Can't set period size " + mDeviceName, -ret);
+	}
+
+	mParams.periodSize = periodFrames *
+						 (params.numChannels  * snd_pcm_format_size(format, 1));
+
+	if (params.periodSize && params.periodSize != mParams.periodSize)
+	{
+		LOG(mLog, WARNING) << "Can't set requested period size. "
+						   << "Nearest value will be used: "
+						   << mParams.periodSize;
+	}
+
+	if ((ret = snd_pcm_hw_params(mHandle, hwParams)) < 0)
+	{
+		throw Exception("Can't set hw params " + mDeviceName, -ret);
+	}
 
 	if (snd_pcm_hw_params_supports_audio_ts_type(hwParams, 0))
 		LOG(mLog, DEBUG) << "Playback supports audio compat timestamps";
@@ -373,8 +441,11 @@ void AlsaPcm::setSwParams()
 		throw Exception("Can't set ts type " + mDeviceName, -ret);
 	}
 
-	if ((ret = snd_pcm_sw_params_set_start_threshold(mHandle, swParams,
-													 mBufferSize * 2)) < 0)
+	snd_pcm_uframes_t threshold =
+			snd_pcm_bytes_to_frames(mHandle, mParams.bufferSize) * 2;
+
+	if ((ret = snd_pcm_sw_params_set_start_threshold(
+			mHandle, swParams, threshold)) < 0)
 	{
 		throw Exception("Can't set start threshold " + mDeviceName, -ret);
 	}
@@ -405,7 +476,7 @@ void AlsaPcm::getTimeStamp()
 	snd_pcm_status_get_audio_htstamp(status, &audioTimeStamp);
 
 	uint64_t frame = ((audioTimeStamp.tv_sec * 1000000000 +
-					 audioTimeStamp.tv_nsec) * mRate) / 1000000000;
+					 audioTimeStamp.tv_nsec) * mParams.rate) / 1000000000;
 
 	frame += mFrameUnderrun;
 
@@ -420,7 +491,9 @@ void AlsaPcm::getTimeStamp()
 		bytes = snd_pcm_frames_to_bytes(mHandle, frame);
 	}
 
-	LOG(mLog, DEBUG) << "Frame: " << frame << ", bytes: " << bytes << ", state: " << state;
+	LOG(mLog, DEBUG) << "Frame: " << frame
+					 << ", bytes: " << bytes
+					 << ", state: " << state;
 
 	if (mProgressCbk)
 	{
