@@ -275,7 +275,7 @@ void PulsePcm::open(const PcmParams& params)
 
 	pa_buffer_attr bufferAttr;
 
-	bufferAttr.maxlength = mParams.bufferSize ? mParams.bufferSize : -1;
+	bufferAttr.maxlength = -1; //mParams.bufferSize ? mParams.bufferSize : -1;
 	bufferAttr.tlength = -1;
 	bufferAttr.prebuf = 0;
 	bufferAttr.minreq = -1;
