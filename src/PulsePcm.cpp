@@ -331,7 +331,7 @@ void PulsePcm::close()
 
 		pa_stream_disconnect(mStream);
 
-		pa_stream_set_state_callback(mStream, nullptr, nullptr);
+		pa_threaded_mainloop_wait(mMainloop);
 
 		pa_stream_unref(mStream);
 
@@ -589,7 +589,11 @@ void PulsePcm::sUpdateTimingCbk(pa_stream *stream, int success, void *data)
 
 void PulsePcm::streamStateChanged()
 {
-	switch (pa_stream_get_state(mStream))
+	auto state = pa_stream_get_state(mStream);
+
+	LOG(mLog, DEBUG) << "Stream state changed: " << state;
+
+	switch (state)
 	{
 		case PA_STREAM_READY:
 		case PA_STREAM_FAILED:
