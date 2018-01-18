@@ -333,6 +333,11 @@ void PulsePcm::close()
 
 		pa_threaded_mainloop_wait(mMainloop);
 
+		pa_stream_set_state_callback(mStream, nullptr, nullptr);
+		pa_stream_set_write_callback(mStream, nullptr, nullptr);
+		pa_stream_set_latency_update_callback(mStream, nullptr, nullptr);
+		pa_stream_set_read_callback(mStream, nullptr, nullptr);
+
 		pa_stream_unref(mStream);
 
 		mStream = nullptr;
