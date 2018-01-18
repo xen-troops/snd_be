@@ -692,7 +692,7 @@ int PulsePcm::waitOperationFinished(pa_operation* op)
 	int states = PA_OK;
 
 	while (pa_operation_get_state(op) == PA_OPERATION_RUNNING &&
-		   (states  = getStatus()) == PA_OK)
+		   (states = getStatus()) == PA_OK)
 	{
 		pa_threaded_mainloop_wait(mMainloop);
 	}
