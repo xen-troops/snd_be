@@ -311,31 +311,13 @@ void PulsePcm::open(const PcmParams& params)
 	}
 
 	waitStreamReady();
-
-	timeval now;
-
-	gettimeofday(&now, nullptr);
-	pa_timeval_add(&now, pa_bytes_to_usec(mParams.periodSize, &mSampleSpec));
-
-	auto api = pa_threaded_mainloop_get_api(mMainloop);
-	mTimeEvent = api->time_new(api, &now, sTimeEventCbk, this);
-
-	if (!mTimeEvent)
-	{
-		throw Exception("Can't create time event " + mName, PA_ERR_UNKNOWN);
-	}
 }
 
 void PulsePcm::close()
 {
 	lock_guard<PulseMutex> lock(mMutex);
 
-	if (mTimeEvent)
-	{
-		pa_threaded_mainloop_get_api(mMainloop)->time_free(mTimeEvent);
-
-		mTimeEvent = nullptr;
-	}
+	stopTimer();
 
 	if (mStream)
 	{
@@ -497,6 +479,8 @@ void PulsePcm::start()
 	}
 
 	pa_operation_unref(op);
+
+	startTimer();
 }
 
 void PulsePcm::stop()
@@ -518,6 +502,8 @@ void PulsePcm::stop()
 	pa_operation_unref(op);
 
 	flush();
+
+	stopTimer();
 }
 
 void PulsePcm::pause()
@@ -774,6 +760,33 @@ pa_sample_format_t PulsePcm::convertPcmFormat(uint8_t format)
 	}
 
 	throw Exception("Can't convert format", PA_ERR_INVALID);
+}
+
+void PulsePcm::startTimer()
+{
+	timeval now;
+
+	gettimeofday(&now, nullptr);
+	pa_timeval_add(&now, pa_bytes_to_usec(mParams.periodSize, &mSampleSpec));
+
+	auto api = pa_threaded_mainloop_get_api(mMainloop);
+	mTimeEvent = api->time_new(api, &now, sTimeEventCbk, this);
+
+	if (!mTimeEvent)
+	{
+		throw Exception("Can't create time event " + mName, PA_ERR_UNKNOWN);
+	}
+}
+
+void PulsePcm::stopTimer()
+{
+	if (mTimeEvent)
+	{
+		auto api = pa_threaded_mainloop_get_api(mMainloop);
+		api->time_free(mTimeEvent);
+
+		mTimeEvent = nullptr;
+	}
 }
 
 }
