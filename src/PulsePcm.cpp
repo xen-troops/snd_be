@@ -341,6 +341,8 @@ void PulsePcm::close()
 
 void PulsePcm::read(uint8_t* buffer, size_t size)
 {
+	lock_guard<PulseMutex> lock(mMutex);
+
 	DLOG(mLog, DEBUG) << "Read from pcm device: " << mName
 					  << ", size: " << size;
 
@@ -353,8 +355,6 @@ void PulsePcm::read(uint8_t* buffer, size_t size)
 	{
 		throw Exception("Can't read stream", PA_ERR_INVALID);
 	}
-
-	lock_guard<PulseMutex> lock(mMutex);
 
 	checkStatus();
 
@@ -412,6 +412,8 @@ void PulsePcm::read(uint8_t* buffer, size_t size)
 
 void PulsePcm::write(uint8_t* buffer, size_t size)
 {
+	lock_guard<PulseMutex> lock(mMutex);
+
 	DLOG(mLog, DEBUG) << "Write to pcm device: " << mName
 					  << ", size: " << size;
 
@@ -424,8 +426,6 @@ void PulsePcm::write(uint8_t* buffer, size_t size)
 	{
 		throw Exception("Can't write stream", PA_ERR_INVALID);
 	}
-
-	lock_guard<PulseMutex> lock(mMutex);
 
 	checkStatus();
 
@@ -464,6 +464,8 @@ void PulsePcm::write(uint8_t* buffer, size_t size)
 
 void PulsePcm::start()
 {
+	lock_guard<PulseMutex> lock(mMutex);
+
 	LOG(mLog, DEBUG) << "Start";
 
 	auto op = pa_stream_cork(mStream, 0, sSuccessCbk, this);
@@ -485,6 +487,8 @@ void PulsePcm::start()
 
 void PulsePcm::stop()
 {
+	lock_guard<PulseMutex> lock(mMutex);
+
 	LOG(mLog, DEBUG) << "Stop";
 
 	auto op = pa_stream_cork(mStream, 1, sSuccessCbk, this);
@@ -508,6 +512,8 @@ void PulsePcm::stop()
 
 void PulsePcm::pause()
 {
+	lock_guard<PulseMutex> lock(mMutex);
+
 	LOG(mLog, DEBUG) << "Pause";
 
 	auto op = pa_stream_cork(mStream, 1, sSuccessCbk, this);
@@ -527,6 +533,8 @@ void PulsePcm::pause()
 
 void PulsePcm::resume()
 {
+	lock_guard<PulseMutex> lock(mMutex);
+
 	LOG(mLog, DEBUG) << "Resume";
 
 	auto op = pa_stream_cork(mStream, 0, sSuccessCbk, this);
