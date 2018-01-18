@@ -259,6 +259,9 @@ private:
 	int getStatus();
 	void checkStatus();
 
+	void startTimer();
+	void stopTimer();
+
 	pa_sample_format_t convertPcmFormat(uint8_t format);
 };
 
