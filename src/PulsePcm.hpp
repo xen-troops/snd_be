@@ -83,21 +83,21 @@ public:
 
 	PulseProplist(const std::string& name, const std::string& value) :
 		PulseProplist()
-    {
-        set(name, value);
-    }
+	{
+		set(name, value);
+	}
 
 	~PulseProplist() { pa_proplist_free(mProplist); }
 
-    int set(const std::string& name, const std::string& value)
-    {
-        return pa_proplist_sets(mProplist, name.c_str(), value.c_str());
-    }
+	int set(const std::string& name, const std::string& value)
+	{
+		return pa_proplist_sets(mProplist, name.c_str(), value.c_str());
+	}
 
-    pa_proplist* operator&() { return mProplist; }
+	pa_proplist* operator&() { return mProplist; }
 
 private:
-    pa_proplist* mProplist;
+	pa_proplist* mProplist;
 };
 
 /***************************************************************************//**
