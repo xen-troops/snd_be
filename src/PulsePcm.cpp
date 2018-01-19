@@ -242,31 +242,9 @@ void PulsePcm::open(const PcmParams& params)
 	mReadIndex = 0;
 	mReadLength = 0;
 
-	if (mStream)
-	{
-		throw Exception("PCM device " + mName + " already opened", PA_ERR_EXIST);
-	}
-
 	mParams = params;
 
-	pa_stream_direction_t streamType = mType == StreamType::PLAYBACK ?
-			PA_STREAM_PLAYBACK : PA_STREAM_RECORD;
-
-	mSampleSpec.format = convertPcmFormat(params.format);
-	mSampleSpec.rate = params.rate;
-	mSampleSpec.channels = params.numChannels;
-
-	PulseProplist propList(mPropName.c_str(), mPropValue.c_str());
-
-	mStream = pa_stream_new_with_proplist(mContext, mName.c_str(), &mSampleSpec,
-										  nullptr, &propList);
-
-	if (!mStream)
-	{
-		throw Exception("Can't open PCM device " + mName, PA_ERR_UNKNOWN);
-	}
-
-	pa_stream_set_state_callback(mStream, sStreamStateChanged, this);
+	createStream();
 
 	const char* deviceName = nullptr;
 
@@ -275,43 +253,13 @@ void PulsePcm::open(const PcmParams& params)
 		deviceName = mDeviceName.c_str();
 	}
 
-	int ret = 0;
-
-	pa_buffer_attr bufferAttr;
-
-	bufferAttr.maxlength = -1; //mParams.bufferSize ? mParams.bufferSize : -1;
-	bufferAttr.tlength = -1;
-	bufferAttr.prebuf = 0;
-	bufferAttr.minreq = -1;
-	bufferAttr.fragsize = -1;
-
-	if (streamType == PA_STREAM_PLAYBACK)
+	if (mType == StreamType::PLAYBACK)
 	{
-		pa_stream_set_write_callback(mStream, sStreamRequest, this);
-		pa_stream_set_latency_update_callback(mStream, sLatencyUpdate, this);
-
-		ret = pa_stream_connect_playback(mStream, deviceName, &bufferAttr,
-										 static_cast<pa_stream_flags_t>(
-										 PA_STREAM_START_CORKED |
-										 PA_STREAM_INTERPOLATE_TIMING |
-										 PA_STREAM_ADJUST_LATENCY |
-										 PA_STREAM_AUTO_TIMING_UPDATE),
-										 nullptr, nullptr);
+		connectPlaybackStream(deviceName);
 	}
 	else
 	{
-		pa_stream_set_read_callback(mStream, sStreamRequest, this);
-
-		ret = pa_stream_connect_record(mStream, deviceName, nullptr,
-									   static_cast<pa_stream_flags_t>(
-									   PA_STREAM_INTERPOLATE_TIMING |
-									   PA_STREAM_ADJUST_LATENCY |
-									   PA_STREAM_AUTO_TIMING_UPDATE));
-	}
-
-	if (ret < 0)
-	{
-		contextError(string("Can't connect to device: ") + deviceName, mContext);
+		connectCaptureStream(deviceName);
 	}
 
 	waitStreamReady();
@@ -388,7 +336,8 @@ void PulsePcm::read(uint8_t* buffer, size_t size)
 				{
 					contextError("Can't drop stream", mContext);
 				}
-			} else
+			}
+			else
 			{
 				mReadIndex = 0;
 			}
@@ -807,6 +756,69 @@ void PulsePcm::stopTimer()
 		api->time_free(mTimeEvent);
 
 		mTimeEvent = nullptr;
+	}
+}
+
+void PulsePcm::createStream()
+{
+	if (mStream)
+	{
+		throw Exception("PCM device " + mName + " already opened", PA_ERR_EXIST);
+	}
+
+	mSampleSpec.format = convertPcmFormat(mParams.format);
+	mSampleSpec.rate = mParams.rate;
+	mSampleSpec.channels = mParams.numChannels;
+
+	PulseProplist propList(mPropName.c_str(), mPropValue.c_str());
+
+	mStream = pa_stream_new_with_proplist(mContext, mName.c_str(), &mSampleSpec,
+										  nullptr, &propList);
+
+	if (!mStream)
+	{
+		throw Exception("Can't open PCM device " + mName, PA_ERR_UNKNOWN);
+	}
+
+	pa_stream_set_state_callback(mStream, sStreamStateChanged, this);
+}
+
+void PulsePcm::connectPlaybackStream(const char* deviceName)
+{
+	pa_buffer_attr bufferAttr;
+
+	bufferAttr.maxlength = -1; //mParams.bufferSize ? mParams.bufferSize : -1;
+	bufferAttr.tlength = -1;
+	bufferAttr.prebuf = 0;
+	bufferAttr.minreq = -1;
+	bufferAttr.fragsize = -1;
+
+	pa_stream_set_write_callback(mStream, sStreamRequest, this);
+	pa_stream_set_latency_update_callback(mStream, sLatencyUpdate, this);
+
+	if (pa_stream_connect_playback(mStream, deviceName, &bufferAttr,
+								   static_cast<pa_stream_flags_t>(
+								   PA_STREAM_START_CORKED |
+								   PA_STREAM_INTERPOLATE_TIMING |
+								   PA_STREAM_ADJUST_LATENCY |
+								   PA_STREAM_AUTO_TIMING_UPDATE),
+								   nullptr, nullptr) < 0)
+	{
+		contextError("Can't connect to device: " + mDeviceName, mContext);
+	}
+}
+
+void PulsePcm::connectCaptureStream(const char* deviceName)
+{
+	pa_stream_set_read_callback(mStream, sStreamRequest, this);
+
+	if (pa_stream_connect_record(mStream, deviceName, nullptr,
+								 static_cast<pa_stream_flags_t>(
+								 PA_STREAM_INTERPOLATE_TIMING |
+								 PA_STREAM_ADJUST_LATENCY |
+								 PA_STREAM_AUTO_TIMING_UPDATE)) < 0)
+	{
+		contextError("Can't connect to device: " + mDeviceName, mContext);
 	}
 }
 
