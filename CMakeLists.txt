@@ -97,7 +97,7 @@ add_subdirectory(src)
 # Versioning
 ################################################################################
 
-# find_package(Git)
+find_package(Git)
 
 if (NOT GIT_FOUND)
 	set(GIT_EXECUTABLE git)
