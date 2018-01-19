@@ -34,74 +34,84 @@ std::atomic_bool mTerminate(false);
 
 void playback(PulseMainloop& mainLoop, const char* fileName)
 {
-	auto playback = mainLoop.createStream(StreamType::PLAYBACK, "Playback");
-
-	playback->open({44100, XENSND_PCM_FORMAT_S16_LE, 2, 65536, 65536/4});
-
-	ifstream file(fileName, std::ifstream::in);
-
-	if (!file.is_open())
+	try
 	{
-		throw XenBackend::Exception("Can't open input file", -1);
-	}
+		auto playback = mainLoop.createStream(StreamType::PLAYBACK, "Playback");
 
-	uint8_t buffer[10000];
-	streamsize size;
+		playback->open({48000, XENSND_PCM_FORMAT_S16_LE, 2, 32768, 8192});
 
-	file.read(reinterpret_cast<char*>(buffer), 10000);
-	size = file.gcount();
+		ifstream file(fileName, std::ifstream::in);
 
-	playback->write(buffer, size);
-	playback->start();
-
-	while(file)
-	{
-		file.read(reinterpret_cast<char*>(buffer), 10000);
-		size = file.gcount();
-
-		if (size)
+		if (!file.is_open())
 		{
-			playback->write(buffer, size);
+			throw XenBackend::Exception("Can't open input file", -1);
 		}
+
+		uint8_t buffer[10000];
+		streamsize size;
+
+		playback->start();
+
+		while(file)
+		{
+			file.read(reinterpret_cast<char*>(buffer), 10000);
+			size = file.gcount();
+
+			if (size != 0)
+			{
+				playback->write(buffer, size);
+			}
+		}
+
+		file.close();
+
+		playback->close();
+
+		delete playback;
 	}
-
-	file.close();
-
-	playback->close();
-
-	delete playback;
+	catch(const std::exception& e)
+	{
+		LOG("Test", ERROR) << e.what();
+	}
 }
 
 void capture(PulseMainloop& mainLoop)
 {
-	ofstream file("out.wav", std::ifstream::out);
-
-	if (!file.is_open())
+	try
 	{
-		throw XenBackend::Exception("Can't open output file", -1);
+		ofstream file("out.wav", std::ifstream::out);
+
+		if (!file.is_open())
+		{
+			throw XenBackend::Exception("Can't open output file", -1);
+		}
+
+		auto capture = mainLoop.createStream(StreamType::CAPTURE, "Capture");
+
+		capture->open({48000, XENSND_PCM_FORMAT_S16_LE, 2, 32768, 8192});
+
+		capture->start();
+
+		uint8_t buffer[10000];
+
+		while(!mTerminate)
+		{
+			capture->read(buffer, 10000);
+			file.write(reinterpret_cast<const char*>(buffer), 10000);
+		}
+
+		capture->stop();
+
+		capture->close();
+
+		delete capture;
+
+		file.close();
 	}
-
-	auto capture = mainLoop.createStream(StreamType::CAPTURE, "Capture");
-
-	capture->open({44100, XENSND_PCM_FORMAT_S16_LE, 2, 65536, 65536/4});
-
-	capture->start();
-
-	uint8_t buffer[10000];
-
-	while(!mTerminate)
+	catch(const std::exception& e)
 	{
-		capture->read(buffer, 10000);
-		file.write(reinterpret_cast<const char*>(buffer), 10000);
+		LOG("Test", ERROR) << e.what();
 	}
-
-	capture->stop();
-
-	capture->close();
-
-	delete capture;
-
-	file.close();
 }
 
 int main()
@@ -114,7 +124,7 @@ int main()
 
 		PulseMainloop mainLoop("Test");
 
-		auto playbackThread = thread(playback, std::ref(mainLoop), "test.wav");
+		auto playbackThread = thread(playback, std::ref(mainLoop), "car_reverse.wav");
 		auto captureThread = thread(capture, std::ref(mainLoop));
 
 		playbackThread.join();
