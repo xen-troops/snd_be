@@ -238,6 +238,10 @@ void PulsePcm::open(const PcmParams& params)
 	  << ", period: " << params.periodSize
 	  << ", buffer: " << params.bufferSize;
 
+	mReadData = nullptr;
+	mReadIndex = 0;
+	mReadLength = 0;
+
 	if (mStream)
 	{
 		throw Exception("PCM device " + mName + " already opened", PA_ERR_EXIST);
