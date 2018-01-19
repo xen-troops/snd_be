@@ -5,7 +5,9 @@
  *      Author: al1
  */
 
+#include <atomic>
 #include <fstream>
+#include <thread>
 
 #include <xen/be/Log.hpp>
 
@@ -16,6 +18,7 @@
 
 using std::exception;
 using std::ifstream;
+using std::ofstream;
 using std::streamsize;
 
 using XenBackend::Log;
@@ -24,7 +27,82 @@ using XenBackend::LogLevel;
 using Alsa::AlsaPcm;
 using Pulse::PulseMainloop;
 using SoundItf::StreamType;
-using SoundItf::SoundException;
+
+using std::thread;
+
+std::atomic_bool mTerminate(false);
+
+void playback(PulseMainloop& mainLoop, const char* fileName)
+{
+	auto playback = mainLoop.createStream(StreamType::PLAYBACK, "Playback");
+
+	playback->open({44100, XENSND_PCM_FORMAT_S16_LE, 2, 65536, 65536/4});
+
+	ifstream file(fileName, std::ifstream::in);
+
+	if (!file.is_open())
+	{
+		throw XenBackend::Exception("Can't open input file", -1);
+	}
+
+	uint8_t buffer[10000];
+	streamsize size;
+
+	file.read(reinterpret_cast<char*>(buffer), 10000);
+	size = file.gcount();
+
+	playback->write(buffer, size);
+	playback->start();
+
+	while(file)
+	{
+		file.read(reinterpret_cast<char*>(buffer), 10000);
+		size = file.gcount();
+
+		if (size)
+		{
+			playback->write(buffer, size);
+		}
+	}
+
+	file.close();
+
+	playback->close();
+
+	delete playback;
+}
+
+void capture(PulseMainloop& mainLoop)
+{
+	ofstream file("out.wav", std::ifstream::out);
+
+	if (!file.is_open())
+	{
+		throw XenBackend::Exception("Can't open output file", -1);
+	}
+
+	auto capture = mainLoop.createStream(StreamType::CAPTURE, "Capture");
+
+	capture->open({44100, XENSND_PCM_FORMAT_S16_LE, 2, 65536, 65536/4});
+
+	capture->start();
+
+	uint8_t buffer[10000];
+
+	while(!mTerminate)
+	{
+		capture->read(buffer, 10000);
+		file.write(reinterpret_cast<const char*>(buffer), 10000);
+	}
+
+	capture->stop();
+
+	capture->close();
+
+	delete capture;
+
+	file.close();
+}
 
 int main()
 {
@@ -32,53 +110,22 @@ int main()
 
 	try
 	{
-		AlsaPcm* stream = new AlsaPcm(StreamType::PLAYBACK);
+//		AlsaPcm* stream = new AlsaPcm(StreamType::PLAYBACK);
 
-#if 0
 		PulseMainloop mainLoop("Test");
 
-		auto stream = mainLoop.createStream(StreamType::PLAYBACK, "Test");
-#endif
+		auto playbackThread = thread(playback, std::ref(mainLoop), "test.wav");
+		auto captureThread = thread(capture, std::ref(mainLoop));
 
+		playbackThread.join();
 
-		stream->open({44100, XENSND_PCM_FORMAT_S16_LE, 2});
+		mTerminate = true;
 
-		ifstream file("car_reverse.wav", std::ifstream::in);
+		captureThread.join();
 
-		if (!file.is_open())
-		{
-			throw SoundException("Can't open input file", -1);
-		}
+		auto repeatThread = thread(playback, std::ref(mainLoop), "out.wav");
 
-		uint8_t buffer[1000];
-		streamsize size;
-
-		sleep(1);
-
-		file.read(reinterpret_cast<char*>(buffer), 1000);
-		size = file.gcount();
-
-		stream->write(buffer, size);
-		stream->start();
-
-		while(file)
-		{
-			file.read(reinterpret_cast<char*>(buffer), 1000);
-			size = file.gcount();
-
-			stream->write(buffer, size);
-			sleep(1);
-
-		}
-
-
-		sleep(1);
-
-		file.close();
-
-		stream->close();
-
-		delete stream;
+		repeatThread.join();
 	}
 	catch(const exception& e)
 	{
