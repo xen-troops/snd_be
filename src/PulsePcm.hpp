@@ -262,6 +262,10 @@ private:
 	void startTimer();
 	void stopTimer();
 
+	void createStream();
+	void connectPlaybackStream(const char* deviceName);
+	void connectCaptureStream(const char* deviceName);
+
 	pa_sample_format_t convertPcmFormat(uint8_t format);
 };
 
