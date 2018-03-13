@@ -153,6 +153,13 @@ public:
 	~PulsePcm();
 
 	/**
+	 * Queries the device for HW intervals and masks.
+	 * @req HW parameters that the frontend wants to set
+	 * @resp refined HW parameters that backend can support
+	 */
+	void queryHwRanges(SoundItf::PcmParamRanges& req, SoundItf::PcmParamRanges& resp) override;
+
+	/**
 	 * Opens the pcm device.
 	 * @param params pcm parameters
 	 */

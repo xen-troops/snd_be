@@ -41,7 +41,9 @@ AlsaPcm::AlsaPcm(StreamType type, const std::string& deviceName) :
 	mDeviceName(deviceName),
 	mType(type),
 	mTimer(bind(&AlsaPcm::getTimeStamp, this), true),
-	mLog("AlsaPcm")
+	mLog("AlsaPcm"),
+	mHwQueryHandle(nullptr),
+	mHwQueryParams(nullptr)
 {
 	if (mDeviceName.empty())
 	{
@@ -62,6 +64,24 @@ AlsaPcm::~AlsaPcm()
  * Public
  ******************************************************************************/
 
+void AlsaPcm::queryHwRanges(SoundItf::PcmParamRanges& req, SoundItf::PcmParamRanges& resp)
+{
+	snd_pcm_hw_params_t* hwParams;
+
+	queryOpen();
+
+	DLOG(mLog, DEBUG) << "Query pcm device " << mDeviceName << " for HW parameters";
+
+	snd_pcm_hw_params_alloca(&hwParams);
+	snd_pcm_hw_params_copy(hwParams, mHwQueryParams);
+
+	queryHwParamFormats(hwParams, req, resp);
+	queryHwParamRate(hwParams, req, resp);
+	queryHwParamChannels(hwParams, req, resp);
+	queryHwParamBuffer(hwParams, req, resp);
+	queryHwParamPeriod(hwParams, req, resp);
+}
+
 void AlsaPcm::open(const PcmParams& params)
 {
 	try
@@ -72,6 +92,8 @@ void AlsaPcm::open(const PcmParams& params)
 				SND_PCM_STREAM_PLAYBACK : SND_PCM_STREAM_CAPTURE;
 
 		int ret = 0;
+
+		queryClose();
 
 		if ((ret = snd_pcm_open(&mHandle, mDeviceName.c_str(),
 							    streamType, 0)) < 0)
@@ -100,6 +122,8 @@ void AlsaPcm::open(const PcmParams& params)
 
 void AlsaPcm::close()
 {
+	queryClose();
+
 	if (mHandle)
 	{
 		DLOG(mLog, DEBUG) << "Close pcm device: " << mDeviceName;
@@ -310,7 +334,7 @@ void AlsaPcm::setHwParams(const PcmParams& params)
 	  << ", period: " << params.periodSize
 	  << ", buffer: " << params.bufferSize;
 
-	snd_pcm_hw_params_t *hwParams = nullptr;
+	snd_pcm_hw_params_t* hwParams = nullptr;
 
 	int ret = 0;
 
@@ -418,7 +442,7 @@ void AlsaPcm::setHwParams(const PcmParams& params)
 
 void AlsaPcm::setSwParams()
 {
-	snd_pcm_sw_params_t *swParams = nullptr;
+	snd_pcm_sw_params_t* swParams = nullptr;
 
 	int ret = 0;
 
@@ -458,7 +482,7 @@ void AlsaPcm::setSwParams()
 
 void AlsaPcm::getTimeStamp()
 {
-	snd_pcm_status_t *status;
+	snd_pcm_status_t* status;
 
 	int ret = 0;
 
@@ -541,6 +565,232 @@ snd_pcm_format_t AlsaPcm::convertPcmFormat(uint8_t format)
 	}
 
 	throw Exception("Can't convert format", EINVAL);
+}
+
+void AlsaPcm::queryOpen()
+{
+	try
+	{
+		snd_pcm_stream_t streamType = mType == StreamType::PLAYBACK ?
+				SND_PCM_STREAM_PLAYBACK : SND_PCM_STREAM_CAPTURE;
+
+		int ret = 0;
+
+		if (!mHwQueryHandle)
+		{
+			DLOG(mLog, DEBUG) << "Opening pcm device for queries: " << mDeviceName;
+
+			if ((ret = snd_pcm_open(&mHwQueryHandle, mDeviceName.c_str(),
+								    streamType, 0)) < 0)
+			{
+				throw Exception("Can't open audio device " + mDeviceName, -ret);
+			}
+
+			/*
+			 * remember this, so next time we need to query we just use
+			 * this copy and save one ioctl call
+			 */
+			snd_pcm_hw_params_malloc(&mHwQueryParams);
+
+			if ((ret = snd_pcm_hw_params_any(mHwQueryHandle, mHwQueryParams)) < 0)
+			{
+				throw Exception("Can't fill hw params " + mDeviceName, -ret);
+			}
+		}
+	}
+	catch(const std::exception& e)
+	{
+		close();
+
+		throw;
+	}
+}
+
+void AlsaPcm::queryClose()
+{
+	if (mHwQueryHandle)
+	{
+		DLOG(mLog, DEBUG) << "Close pcm query device: " << mDeviceName;
+
+		snd_pcm_close(mHwQueryHandle);
+	}
+
+	if (mHwQueryParams)
+	{
+		snd_pcm_hw_params_free(mHwQueryParams);
+	}
+
+	mHwQueryHandle = nullptr;
+	mHwQueryParams = nullptr;
+}
+
+void AlsaPcm::queryHwParamRate(snd_pcm_hw_params_t* hwParams,
+							   SoundItf::PcmParamRanges& req,
+							   SoundItf::PcmParamRanges& resp)
+{
+	int ret;
+
+	if ((ret = snd_pcm_hw_params_set_rate_minmax(mHwQueryHandle, hwParams,
+			&req.rates.min, 0, &req.rates.max, 0)) < 0)
+	{
+		/*
+		 * This is not really a fatal error, the frontend just tries to
+		 * reduce configuration space.
+		 * But, anyway, throw now, so we can return error code to
+		 * the frontend.
+		 */
+		throw;
+	}
+
+	if ((ret = snd_pcm_hw_params_get_rate_min(hwParams, &resp.rates.min, 0)) < 0)
+	{
+		throw Exception("Can't get rate min " + mDeviceName, -ret);
+	}
+
+	if ((ret = snd_pcm_hw_params_get_rate_max(mHwQueryParams, &resp.rates.max, 0)) < 0)
+	{
+		throw Exception("Can't get rate max " + mDeviceName, -ret);
+	}
+}
+
+void AlsaPcm::queryHwParamBuffer(snd_pcm_hw_params_t* hwParams,
+								 SoundItf::PcmParamRanges& req,
+								 SoundItf::PcmParamRanges& resp)
+
+{
+	snd_pcm_uframes_t minFrames = static_cast<snd_pcm_uframes_t>(req.buffer.min);
+	snd_pcm_uframes_t maxFrames = static_cast<snd_pcm_uframes_t>(req.buffer.max);
+	int ret;
+
+	if ((ret = snd_pcm_hw_params_set_buffer_size_minmax(mHwQueryHandle, hwParams,
+			&minFrames, &maxFrames)) < 0)
+	{
+		/*
+		 * This is not really a fatal error, the frontend just tries to
+		 * reduce configuration space.
+		 * But, anyway, throw now, so we can return error code to
+		 * the frontend.
+		 */
+		throw;
+	}
+
+	if ((ret = snd_pcm_hw_params_get_buffer_size_min(hwParams, &minFrames)) < 0)
+	{
+		throw Exception("Can't get buffer min" + mDeviceName, -ret);
+	}
+
+	if ((ret = snd_pcm_hw_params_get_buffer_size_max(hwParams, &maxFrames)) < 0)
+	{
+		throw Exception("Can't get buffer max" + mDeviceName, -ret);
+	}
+
+	resp.buffer.min = static_cast<unsigned int>(minFrames);
+	resp.buffer.max = static_cast<unsigned int>(maxFrames);
+}
+
+void AlsaPcm::queryHwParamChannels(snd_pcm_hw_params_t* hwParams,
+								   SoundItf::PcmParamRanges& req,
+								   SoundItf::PcmParamRanges& resp)
+{
+	int ret;
+
+	if ((ret = snd_pcm_hw_params_set_channels_minmax(mHwQueryHandle, hwParams,
+			&req.channels.min, &req.channels.max)) < 0)
+	{
+		/*
+		 * This is not really a fatal error, the frontend just tries to
+		 * reduce configuration space.
+		 * But, anyway, throw now, so we can return error code to
+		 * the frontend.
+		 */
+	}
+
+	if ((ret = snd_pcm_hw_params_get_channels_min(hwParams, &resp.channels.min)) < 0)
+	{
+		throw Exception("Can't get channels min " + mDeviceName, -ret);
+	}
+
+	if ((ret = snd_pcm_hw_params_get_channels_max(hwParams, &resp.channels.max)) < 0)
+	{
+		throw Exception("Can't get channels max " + mDeviceName, -ret);
+	}
+}
+
+void AlsaPcm::queryHwParamPeriod(snd_pcm_hw_params_t* hwParams,
+								 SoundItf::PcmParamRanges& req,
+								 SoundItf::PcmParamRanges& resp)
+{
+	snd_pcm_uframes_t minFrames = static_cast<snd_pcm_uframes_t>(req.period.min);
+	snd_pcm_uframes_t maxFrames = static_cast<snd_pcm_uframes_t>(req.period.max);
+	int ret;
+
+	if ((ret = snd_pcm_hw_params_set_period_size_minmax(mHwQueryHandle, hwParams,
+			&minFrames, 0, &maxFrames, 0)) < 0)
+	{
+		/*
+		 * This is not really a fatal error, the frontend just tries to
+		 * reduce configuration space.
+		 * But, anyway, throw now, so we can return error code to
+		 * the frontend.
+		 */
+		throw;
+	}
+
+	if ((ret = snd_pcm_hw_params_get_period_size_min(hwParams, &minFrames, 0)) < 0)
+	{
+		throw Exception("Can't get period min" + mDeviceName, -ret);
+	}
+
+	if ((ret = snd_pcm_hw_params_get_period_size_max(hwParams, &maxFrames, 0)) < 0)
+	{
+		throw Exception("Can't get period max" + mDeviceName, -ret);
+	}
+
+	resp.period.min = static_cast<unsigned int>(minFrames);
+	resp.period.max = static_cast<unsigned int>(maxFrames);
+}
+
+void AlsaPcm::queryHwParamFormats(snd_pcm_hw_params_t* hwParams,
+								  SoundItf::PcmParamRanges& req,
+								  SoundItf::PcmParamRanges& resp)
+{
+	snd_pcm_format_mask_t* alsa_formats;
+	int ret;
+
+	snd_pcm_format_mask_alloca(&alsa_formats);
+	snd_pcm_format_mask_none(alsa_formats);
+
+	for (auto value : sPcmFormat)
+	{
+		if (1 << value.sndif & req.formats)
+		{
+			snd_pcm_format_mask_set(alsa_formats, value.alsa);
+		}
+	}
+
+	if ((ret = snd_pcm_hw_params_set_format_mask(mHwQueryHandle, hwParams,
+			alsa_formats)) < 0)
+	{
+		/*
+		 * This is not really a fatal error, the frontend just tries to
+		 * reduce configuration space.
+		 * But, anyway, throw now, so we can return error code to
+		 * the frontend.
+		 */
+		throw;
+	}
+
+	snd_pcm_hw_params_get_format_mask(hwParams, alsa_formats);
+
+	resp.formats = 0;
+
+	for (auto value : sPcmFormat)
+	{
+		if (snd_pcm_format_mask_test(alsa_formats, value.alsa))
+		{
+			resp.formats |= 1 << value.sndif;
+		}
+	}
 }
 
 }

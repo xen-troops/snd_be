@@ -68,6 +68,13 @@ public:
 	~AlsaPcm();
 
 	/**
+	 * Queries the device for HW intervals and masks.
+	 * @req HW parameters that the frontend wants to set
+	 * @resp refined HW parameters that backend can support
+	 */
+	void queryHwRanges(SoundItf::PcmParamRanges& req, SoundItf::PcmParamRanges& resp) override;
+
+	/**
 	 * Opens the pcm device.
 	 * @param params pcm parameters
 	 */
@@ -134,7 +141,7 @@ private:
 
 	static PcmFormat sPcmFormat[];
 
-	snd_pcm_t *mHandle;
+	snd_pcm_t* mHandle;
 	std::string mDeviceName;
 	SoundItf::StreamType mType;
 	XenBackend::Timer mTimer;
@@ -146,10 +153,32 @@ private:
 	snd_pcm_uframes_t mFrameWritten;
 	snd_pcm_uframes_t mFrameUnderrun;
 
+	snd_pcm_t* mHwQueryHandle;
+	snd_pcm_hw_params_t* mHwQueryParams;
+
 	void setHwParams(const SoundItf::PcmParams& params);
 	void setSwParams();
 	void getTimeStamp();
 	snd_pcm_format_t convertPcmFormat(uint8_t format);
+
+	void queryOpen();
+	void queryClose();
+
+	void queryHwParamRate(snd_pcm_hw_params_t* hwParams,
+			      SoundItf::PcmParamRanges& req,
+			      SoundItf::PcmParamRanges& resp);
+	void queryHwParamBuffer(snd_pcm_hw_params_t* hwParams,
+				SoundItf::PcmParamRanges& req,
+				SoundItf::PcmParamRanges& resp);
+	void queryHwParamChannels(snd_pcm_hw_params_t* hwParams,
+				  SoundItf::PcmParamRanges& req,
+				  SoundItf::PcmParamRanges& resp);
+	void queryHwParamPeriod(snd_pcm_hw_params_t* hwParams,
+				SoundItf::PcmParamRanges& req,
+				SoundItf::PcmParamRanges& resp);
+	void queryHwParamFormats(snd_pcm_hw_params_t* hwParams,
+				 SoundItf::PcmParamRanges& req,
+				 SoundItf::PcmParamRanges& resp);
 };
 
 }
