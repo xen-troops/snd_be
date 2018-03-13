@@ -79,11 +79,11 @@ public:
 	 * @param req
 	 * @return status
 	 */
-	int processCommand(const xensnd_req& req);
+	int processCommand(const xensnd_req& req, xensnd_resp& rsp);
 
 private:
 
-	typedef void(CommandHandler::*CommandFn)(const xensnd_req& req);
+	typedef void(CommandHandler::*CommandFn)(const xensnd_req& req, xensnd_resp& rsp);
 
 	static std::unordered_map<int, CommandFn> sCmdTable;
 
@@ -97,11 +97,12 @@ private:
 
 	void progressCbk(uint64_t bytes);
 
-	void open(const xensnd_req& req);
-	void close(const xensnd_req& req);
-	void read(const xensnd_req& req);
-	void write(const xensnd_req& req);
-	void trigger(const xensnd_req& req);
+	void open(const xensnd_req& req, xensnd_resp& rsp);
+	void close(const xensnd_req& req, xensnd_resp& rsp);
+	void read(const xensnd_req& req, xensnd_resp& rsp);
+	void write(const xensnd_req& req, xensnd_resp& rsp);
+	void trigger(const xensnd_req& req, xensnd_resp& rsp);
+	void queryHwParam(const xensnd_req& req, xensnd_resp& rsp);
 
 	void getBufferRefs(grant_ref_t startDirectory, uint32_t size, std::vector<grant_ref_t>& refs);
 };

@@ -66,6 +66,35 @@ struct PcmParams
 };
 
 /***************************************************************************//**
+ * Describes pcm parameter ranges.
+ * @ingroup sound
+ ******************************************************************************/
+struct PcmParamRanges
+{
+	uint64_t formats;
+	struct
+	{
+		unsigned int min;
+		unsigned int max;
+	} rates;
+	struct
+	{
+		unsigned int min;
+		unsigned int max;
+	} channels;
+	struct
+	{
+		unsigned int min;
+		unsigned int max;
+	} buffer;
+	struct
+	{
+		unsigned int min;
+		unsigned int max;
+	} period;
+};
+
+/***************************************************************************//**
  * Provides sound functionality.
  * @ingroup sound
  ******************************************************************************/
@@ -74,6 +103,13 @@ class PcmDevice
 public:
 
 	virtual ~PcmDevice() {}
+
+	/**
+	 * Queries the device for HW intervals and masks.
+	 * @req HW parameters that the frontend wants to set
+	 * @resp refined HW parameters that backend can support
+	 */
+	virtual void queryHwRanges(PcmParamRanges& req, PcmParamRanges& resp) = 0;
 
 	/**
 	 * Opens the device.

@@ -822,4 +822,9 @@ void PulsePcm::connectCaptureStream(const char* deviceName)
 	}
 }
 
+void PulsePcm::queryHwRanges(SoundItf::PcmParamRanges& req, SoundItf::PcmParamRanges& resp)
+{
+	throw Exception("NOT IMPLEMNTED " + mName, PA_ERR_UNKNOWN);
+}
+
 }

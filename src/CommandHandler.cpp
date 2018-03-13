@@ -49,11 +49,12 @@ using SoundItf::PcmParams;
 
 unordered_map<int, CommandHandler::CommandFn> CommandHandler::sCmdTable =
 {
-	{XENSND_OP_OPEN,	&CommandHandler::open},
-	{XENSND_OP_CLOSE,	&CommandHandler::close},
-	{XENSND_OP_READ,	&CommandHandler::read},
-	{XENSND_OP_WRITE,	&CommandHandler::write},
-	{XENSND_OP_TRIGGER, &CommandHandler::trigger}
+	{XENSND_OP_OPEN,					&CommandHandler::open},
+	{XENSND_OP_CLOSE,					&CommandHandler::close},
+	{XENSND_OP_READ,					&CommandHandler::read},
+	{XENSND_OP_WRITE,					&CommandHandler::write},
+	{XENSND_OP_TRIGGER,					&CommandHandler::trigger},
+	{XENSND_OP_HW_PARAM_QUERY,			&CommandHandler::queryHwParam},
 };
 
 /*******************************************************************************
@@ -83,13 +84,13 @@ CommandHandler::~CommandHandler()
  * Public
  ******************************************************************************/
 
-int CommandHandler::processCommand(const xensnd_req& req)
+int CommandHandler::processCommand(const xensnd_req& req, xensnd_resp& rsp)
 {
 	int status = 0;
 
 	try
 	{
-		(this->*sCmdTable.at(req.operation))(req);
+		(this->*sCmdTable.at(req.operation))(req, rsp);
 	}
 	catch(const XenBackend::Exception& e)
 	{
@@ -136,7 +137,7 @@ void CommandHandler::progressCbk(uint64_t frame)
 	mEventRingBuffer->sendEvent(event);
 }
 
-void CommandHandler::open(const xensnd_req& req)
+void CommandHandler::open(const xensnd_req& req, xensnd_resp& rsp)
 {
 	DLOG(mLog, DEBUG) << "Handle command [OPEN]";
 
@@ -154,7 +155,7 @@ void CommandHandler::open(const xensnd_req& req)
 					   openReq.period_sz } );
 }
 
-void CommandHandler::close(const xensnd_req& req)
+void CommandHandler::close(const xensnd_req& req, xensnd_resp& rsp)
 {
 	DLOG(mLog, DEBUG) << "Handle command [CLOSE]";
 
@@ -163,7 +164,7 @@ void CommandHandler::close(const xensnd_req& req)
 	mPcmDevice->close();
 }
 
-void CommandHandler::read(const xensnd_req& req)
+void CommandHandler::read(const xensnd_req& req, xensnd_resp& rsp)
 {
 	DLOG(mLog, DEBUG) << "Handle command [READ]";
 
@@ -173,7 +174,7 @@ void CommandHandler::read(const xensnd_req& req)
 					 readReq.length);
 }
 
-void CommandHandler::write(const xensnd_req& req)
+void CommandHandler::write(const xensnd_req& req, xensnd_resp& rsp)
 {
 	DLOG(mLog, DEBUG) << "Handle command [WRITE]";
 
@@ -183,7 +184,7 @@ void CommandHandler::write(const xensnd_req& req)
 					  writeReq.length);
 }
 
-void CommandHandler::trigger(const xensnd_req& req)
+void CommandHandler::trigger(const xensnd_req& req, xensnd_resp& rsp)
 {
 	const xensnd_trigger_req& triggerReq = req.op.trigger;
 
@@ -208,6 +209,46 @@ void CommandHandler::trigger(const xensnd_req& req)
 	default:
 		throw XenBackend::Exception("Unknown trigger type", -EINVAL);
 	}
+}
+
+void CommandHandler::queryHwParam(const xensnd_req& req, xensnd_resp& rsp)
+{
+	const xensnd_query_hw_param& queryHwParamReq = req.op.hw_param;
+	xensnd_query_hw_param& queryHwParamResp = rsp.resp.hw_param;
+	SoundItf::PcmParamRanges sndReq;
+	SoundItf::PcmParamRanges sndResp;
+
+	DLOG(mLog, DEBUG) << "Handle command [QUERY_HW_PARAM]";
+
+	sndReq.formats = queryHwParamReq.formats;
+
+	sndReq.rates.min = queryHwParamReq.rates.min;
+	sndReq.rates.max = queryHwParamReq.rates.max;
+
+	sndReq.channels.min = queryHwParamReq.channels.min;
+	sndReq.channels.max = queryHwParamReq.channels.max;
+
+	sndReq.buffer.min = queryHwParamReq.buffer.min;
+	sndReq.buffer.max = queryHwParamReq.buffer.max;
+
+	sndReq.period.min = queryHwParamReq.period.min;
+	sndReq.period.max = queryHwParamReq.period.max;
+
+	mPcmDevice->queryHwRanges(sndReq, sndResp);
+
+	queryHwParamResp.formats = sndResp.formats;
+
+	queryHwParamResp.rates.min = sndResp.rates.min;
+	queryHwParamResp.rates.max = sndResp.rates.max;
+
+	queryHwParamResp.channels.min = sndResp.channels.min;
+	queryHwParamResp.channels.max = sndResp.channels.max;
+
+	queryHwParamResp.buffer.min = sndResp.buffer.min;
+	queryHwParamResp.buffer.max = sndResp.buffer.max;
+
+	queryHwParamResp.period.min = sndResp.period.min;
+	queryHwParamResp.period.max = sndResp.period.max;
 }
 
 void CommandHandler::getBufferRefs(grant_ref_t startDirectory, uint32_t size,
