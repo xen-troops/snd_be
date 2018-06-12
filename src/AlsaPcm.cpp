@@ -75,6 +75,9 @@ void AlsaPcm::queryHwRanges(SoundItf::PcmParamRanges& req, SoundItf::PcmParamRan
 	snd_pcm_hw_params_alloca(&hwParams);
 	snd_pcm_hw_params_copy(hwParams, mHwQueryParams);
 
+	// copy req to resp to have valid values in case error occurs
+	resp = req;
+
 	queryHwParamFormats(hwParams, req, resp);
 	queryHwParamRate(hwParams, req, resp);
 	queryHwParamChannels(hwParams, req, resp);
@@ -631,15 +634,10 @@ void AlsaPcm::queryHwParamRate(snd_pcm_hw_params_t* hwParams,
 	int ret;
 
 	if ((ret = snd_pcm_hw_params_set_rate_minmax(mHwQueryHandle, hwParams,
-			&req.rates.min, 0, &req.rates.max, 0)) < 0)
+												 &req.rates.min, 0,
+												 &req.rates.max, 0)) < 0)
 	{
-		/*
-		 * This is not really a fatal error, the frontend just tries to
-		 * reduce configuration space.
-		 * But, anyway, throw now, so we can return error code to
-		 * the frontend.
-		 */
-		throw;
+		throw Exception("Can't set rate minmax " + mDeviceName, -ret);
 	}
 
 	if ((ret = snd_pcm_hw_params_get_rate_min(hwParams, &resp.rates.min, 0)) < 0)
@@ -663,15 +661,9 @@ void AlsaPcm::queryHwParamBuffer(snd_pcm_hw_params_t* hwParams,
 	int ret;
 
 	if ((ret = snd_pcm_hw_params_set_buffer_size_minmax(mHwQueryHandle, hwParams,
-			&minFrames, &maxFrames)) < 0)
+														&minFrames, &maxFrames)) < 0)
 	{
-		/*
-		 * This is not really a fatal error, the frontend just tries to
-		 * reduce configuration space.
-		 * But, anyway, throw now, so we can return error code to
-		 * the frontend.
-		 */
-		throw;
+		throw Exception("Can't set buffer size minmax " + mDeviceName, -ret);
 	}
 
 	if ((ret = snd_pcm_hw_params_get_buffer_size_min(hwParams, &minFrames)) < 0)
@@ -695,14 +687,10 @@ void AlsaPcm::queryHwParamChannels(snd_pcm_hw_params_t* hwParams,
 	int ret;
 
 	if ((ret = snd_pcm_hw_params_set_channels_minmax(mHwQueryHandle, hwParams,
-			&req.channels.min, &req.channels.max)) < 0)
+													 &req.channels.min,
+													 &req.channels.max)) < 0)
 	{
-		/*
-		 * This is not really a fatal error, the frontend just tries to
-		 * reduce configuration space.
-		 * But, anyway, throw now, so we can return error code to
-		 * the frontend.
-		 */
+		throw Exception("Can't set channels minmax " + mDeviceName, -ret);
 	}
 
 	if ((ret = snd_pcm_hw_params_get_channels_min(hwParams, &resp.channels.min)) < 0)
@@ -727,23 +715,17 @@ void AlsaPcm::queryHwParamPeriod(snd_pcm_hw_params_t* hwParams,
 	if ((ret = snd_pcm_hw_params_set_period_size_minmax(mHwQueryHandle, hwParams,
 			&minFrames, 0, &maxFrames, 0)) < 0)
 	{
-		/*
-		 * This is not really a fatal error, the frontend just tries to
-		 * reduce configuration space.
-		 * But, anyway, throw now, so we can return error code to
-		 * the frontend.
-		 */
-		throw;
+		throw Exception("Can't set period size minmax " + mDeviceName, -ret);
 	}
 
 	if ((ret = snd_pcm_hw_params_get_period_size_min(hwParams, &minFrames, 0)) < 0)
 	{
-		throw Exception("Can't get period min" + mDeviceName, -ret);
+		throw Exception("Can't get period min " + mDeviceName, -ret);
 	}
 
 	if ((ret = snd_pcm_hw_params_get_period_size_max(hwParams, &maxFrames, 0)) < 0)
 	{
-		throw Exception("Can't get period max" + mDeviceName, -ret);
+		throw Exception("Can't get period max " + mDeviceName, -ret);
 	}
 
 	resp.period.min = static_cast<unsigned int>(minFrames);
@@ -769,15 +751,9 @@ void AlsaPcm::queryHwParamFormats(snd_pcm_hw_params_t* hwParams,
 	}
 
 	if ((ret = snd_pcm_hw_params_set_format_mask(mHwQueryHandle, hwParams,
-			alsa_formats)) < 0)
+												 alsa_formats)) < 0)
 	{
-		/*
-		 * This is not really a fatal error, the frontend just tries to
-		 * reduce configuration space.
-		 * But, anyway, throw now, so we can return error code to
-		 * the frontend.
-		 */
-		throw;
+		throw Exception("Can't set format mask " + mDeviceName, -ret);
 	}
 
 	snd_pcm_hw_params_get_format_mask(hwParams, alsa_formats);
