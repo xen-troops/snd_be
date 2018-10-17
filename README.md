@@ -56,6 +56,44 @@ make doc // build documentation
 make install // to default location
 make DESTDIR=${PATH_TO_INSTALL} install //to other location
 ```
+## Configuration:
+
+Backend configuration is done in domain configuration file. See vsnd on http://xenbits.xen.org/docs/unstable-staging/man/xl.cfg.5.html#Devices
+
+In order to match virtual stream with real one, stream unique-id parameter is used. This parameter has following format:
+
+`pcmtype<device>propname:propvalue`
+
+All fields except `pcmtype` are optional.
+
+* `pcmtype` - specifies PCM type: "pulse" or "alsa";
+* `device` - device name
+    * for pulse: sink or source name
+    * for alsa: alsa device like HW:0;1 (note that ";" used instead of "," because "," is field separator in domain config file)
+* `propname` (relevant for pulse) - stream property name: like media.role etc.
+* `propvalue` (relevant for pulse) - stream property value: like navi, phone etc.
+
+Stream property is used to identify pulse stream by other system modules such as audio manager etc.
+
+Some configuration examples:
+```
+vsnd = [[ 'card, backend=DomD, buffer-size=65536, short-name=VCard, long-name=Virtual sound card, sample-rates=48000, sample-formats=s16_le',
+          'pcm, name=dev1', 'stream, unique-id=alsa, type=P' ]]
+```
+The backend will provide default alsa device for the configured stream playback.
+
+Other unique-id values example:
+```
+# the backend will provide default pulse device for the configured stream
+unique-id=pulse
+# the backend will provide pulse pci-0000_00_1f.3.analog-stereo device for the configured stream
+unique-id=pulse<pci-0000_00_1f.3.analog-stereo> 
+# the backend will provide default pulse device for the configured stream and set media.role property of stream to navi
+unique-id=pulse<>media.role:navi
+# the backend will provide alsa card0 device 0 for the configured stream 
+unique-id=alsa<hw:0;0>
+```
+
 ## How to run:
 ```
 snd_be -v${LOG_MASK}
