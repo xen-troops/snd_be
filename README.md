@@ -58,7 +58,7 @@ make DESTDIR=${PATH_TO_INSTALL} install //to other location
 ```
 ## How to run:
 ```
-disple_be -v${LOG_MASK}
+snd_be -v${LOG_MASK}
 ```
 Example:
 
