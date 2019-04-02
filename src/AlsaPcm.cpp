@@ -114,6 +114,10 @@ void AlsaPcm::open(const PcmParams& params)
 
 		mFrameWritten = 0;
 		mFrameUnderrun = 0;
+
+		mTimerPeriodMs = milliseconds(
+			(snd_pcm_bytes_to_frames(mHandle, mParams.periodSize) * 1000) /
+			mParams.rate);
 	}
 	catch(const std::exception& e)
 	{
@@ -256,11 +260,7 @@ void AlsaPcm::start()
 		throw Exception("Can't start device " + mDeviceName, -ret);
 	}
 
-	auto time =
-			(snd_pcm_bytes_to_frames(mHandle, mParams.periodSize) * 1000) /
-			mParams.rate;
-
-	mTimer.start(milliseconds(time));
+	mTimer.start(mTimerPeriodMs);
 }
 
 void AlsaPcm::stop()
@@ -304,6 +304,8 @@ void AlsaPcm::pause()
 	{
 		throw Exception("Can't pause device " + mDeviceName, -ret);
 	}
+
+	mTimer.stop();
 }
 
 void AlsaPcm::resume()
@@ -322,6 +324,8 @@ void AlsaPcm::resume()
 	{
 		throw Exception("Can't resume device " + mDeviceName, -ret);
 	}
+
+	mTimer.start(mTimerPeriodMs);
 }
 
 /*******************************************************************************

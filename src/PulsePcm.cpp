@@ -616,11 +616,11 @@ void PulsePcm::updateTimingCbk(int success)
 
 	auto bytes = pa_usec_to_bytes(time, &mSampleSpec);
 
-	DLOG(mLog, DEBUG) << "Update timing, usec: " << time / 1000
-					  << ", bytes: " << bytes;
-
-	if (mProgressCbk)
+	if (mProgressCbk && !pa_stream_is_corked(mStream))
 	{
+		DLOG(mLog, DEBUG) << "Update timing, usec: " << time / 1000
+						  << ", bytes: " << bytes;
+
 		mProgressCbk(bytes);
 	}
 }
