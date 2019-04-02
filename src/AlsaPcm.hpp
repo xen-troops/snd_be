@@ -145,6 +145,7 @@ private:
 	std::string mDeviceName;
 	SoundItf::StreamType mType;
 	XenBackend::Timer mTimer;
+	std::chrono::milliseconds mTimerPeriodMs;
 	XenBackend::Log mLog;
 
 	SoundItf::PcmParams mParams;
