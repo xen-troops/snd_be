@@ -77,10 +77,14 @@ Stream property is used to identify pulse stream by other system modules such as
 
 Some configuration examples:
 ```
+# The backend will provide default pulse device for the configured stream playback.
 vsnd = [[ 'card, backend=DomD, buffer-size=65536, short-name=VCard, long-name=Virtual sound card, sample-rates=48000, sample-formats=s16_le',
-          'pcm, name=dev1', 'stream, unique-id=alsa, type=P' ]]
+          'pcm, name=dev1', 'stream, unique-id=pulse, type=P' ]]
+
+# The backend will use ALSA device hw:0,0 for playback. Pay attention that "0,0" have to be replaced by "0;0", and sample format is s24_le.
+vsnd = [[ 'card, backend=DomD, buffer-size=32768, short-name=VCard, long-name=Virtual sound card, sample-rates=48000, sample-formats=s24_le',
+          'pcm, name=dev1', 'stream, unique-id=alsa<hw:0;0>, type=P' ]]
 ```
-The backend will provide default alsa device for the configured stream playback.
 
 Other unique-id values example:
 ```
