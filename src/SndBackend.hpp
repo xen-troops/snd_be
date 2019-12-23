@@ -82,12 +82,11 @@ public:
 
 	/**
 	 * @param devName device name
-	 * @param beDomId backend domain id
-	 * @param feDomId frontend domain id
+	 * @param domId frontend domain id
 	 * @param devId   device id
 	 */
 	SndFrontendHandler(const std::string devName,
-					   domid_t beDomId, domid_t feDomId, uint16_t devId);
+					   domid_t domId, uint16_t devId);
 
 protected:
 

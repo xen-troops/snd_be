@@ -111,11 +111,10 @@ void StreamRingBuffer::processRequest(const xensnd_req& req)
  * SndFrontendHandler
  ******************************************************************************/
 SndFrontendHandler::SndFrontendHandler(const string devName,
-									   domid_t beDomId, domid_t feDomId,
-									   uint16_t devId) :
-	FrontendHandlerBase("SndFrontend", devName, beDomId, feDomId, devId),
+									   domid_t domId, uint16_t devId) :
+	FrontendHandlerBase("SndFrontend", devName, domId, devId),
 #ifdef WITH_PULSE
-	mPulseMainloop("Dom" + to_string(feDomId) + ":" + to_string(devId)),
+	mPulseMainloop("Dom" + to_string(domId) + ":" + to_string(devId)),
 #endif
 	mLog("SndFrontend")
 {
@@ -350,7 +349,7 @@ string SndFrontendHandler::parsePropValue(string& input)
 void SndBackend::onNewFrontend(domid_t domId, uint16_t devId)
 {
 	addFrontendHandler(FrontendHandlerPtr(new SndFrontendHandler(
-			getDeviceName(), getDomId(), domId, devId)));
+			getDeviceName(), domId, devId)));
 }
 
 /*******************************************************************************
