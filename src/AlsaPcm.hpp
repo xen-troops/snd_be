@@ -147,6 +147,8 @@ private:
 	XenBackend::Timer mTimer;
 	std::chrono::milliseconds mTimerPeriodMs;
 	XenBackend::Log mLog;
+	uint32_t dev_status;
+	uint32_t query_status;
 
 	SoundItf::PcmParams mParams;
 
