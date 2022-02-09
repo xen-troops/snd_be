@@ -43,7 +43,9 @@ AlsaPcm::AlsaPcm(StreamType type, const std::string& deviceName) :
 	mTimer(bind(&AlsaPcm::getTimeStamp, this), true),
 	mLog("AlsaPcm"),
 	mHwQueryHandle(nullptr),
-	mHwQueryParams(nullptr)
+	mHwQueryParams(nullptr),
+	dev_status(0),
+	query_status(0)
 {
 	if (mDeviceName.empty())
 	{
@@ -57,7 +59,12 @@ AlsaPcm::~AlsaPcm()
 {
 	LOG(mLog, DEBUG) << "Delete pcm device: " << mDeviceName;
 
-	close();
+	if (dev_status != 0)
+		close();
+	if (query_status != 0)
+		queryClose();
+	dev_status = 0;
+	query_status = 0;
 }
 
 /*******************************************************************************
@@ -96,13 +103,23 @@ void AlsaPcm::open(const PcmParams& params)
 
 		int ret = 0;
 
-		queryClose();
-
-		if ((ret = snd_pcm_open(&mHandle, mDeviceName.c_str(),
-							    streamType, 0)) < 0)
+		if(query_status != 0 && dev_status == 0)
 		{
-			throw Exception("Can't open audio device " + mDeviceName, -ret);
+			mHandle = mHwQueryHandle;
 		}
+		else
+		{
+			if(query_status == 0 && dev_status == 0)
+			{
+				if ((ret = snd_pcm_open(&mHandle, mDeviceName.c_str(),
+								streamType, 0)) < 0)
+				{
+					throw Exception("AlsaPcm::open --- Can't open audio device " + mDeviceName, -ret);
+				}
+			}
+		}
+
+		dev_status++;
 
 		setHwParams(params);
 		setSwParams();
@@ -116,8 +133,9 @@ void AlsaPcm::open(const PcmParams& params)
 		mFrameUnderrun = 0;
 
 		mTimerPeriodMs = milliseconds(
-			(snd_pcm_bytes_to_frames(mHandle, mParams.periodSize) * 1000) /
-			mParams.rate);
+				(snd_pcm_bytes_to_frames(mHandle, mParams.periodSize) * 1000) /
+				mParams.rate);
+
 	}
 	catch(const std::exception& e)
 	{
@@ -129,8 +147,6 @@ void AlsaPcm::open(const PcmParams& params)
 
 void AlsaPcm::close()
 {
-	queryClose();
-
 	if (mHandle)
 	{
 		DLOG(mLog, DEBUG) << "Close pcm device: " << mDeviceName;
@@ -139,7 +155,12 @@ void AlsaPcm::close()
 
 		mTimer.stop();
 
-		snd_pcm_close(mHandle);
+		if(dev_status != 0 && query_status == 0)
+		{
+			snd_pcm_close(mHandle);
+		}
+
+		dev_status--;
 	}
 
 	mHandle = nullptr;
@@ -199,7 +220,7 @@ void AlsaPcm::write(uint8_t* buffer, size_t size)
 		{
 			DLOG(mLog, DEBUG) << "Write to pcm device: " << mDeviceName
 							  << ", size: " << status;
-
+			 
 
 			if (status == -EPIPE)
 			{
@@ -311,7 +332,7 @@ void AlsaPcm::pause()
 void AlsaPcm::resume()
 {
 	LOG(mLog, DEBUG) << "Resume";
-
+	
 	if (!mHandle)
 	{
 		throw Exception("Alsa device is not opened: " +
@@ -587,11 +608,23 @@ void AlsaPcm::queryOpen()
 		{
 			DLOG(mLog, DEBUG) << "Opening pcm device for queries: " << mDeviceName;
 
-			if ((ret = snd_pcm_open(&mHwQueryHandle, mDeviceName.c_str(),
-								    streamType, 0)) < 0)
+			if(dev_status != 0 && query_status == 0)
 			{
-				throw Exception("Can't open audio device " + mDeviceName, -ret);
+				mHwQueryHandle = mHandle;
 			}
+			else
+			{
+				if(dev_status == 0 && query_status == 0)
+				{
+					if ((ret = snd_pcm_open(&mHwQueryHandle, mDeviceName.c_str(),
+									streamType, 0)) < 0)
+					{
+						throw Exception("AlsaPcm::queryOpen --- Can't open audio device " + mDeviceName, -ret);
+					}
+				}
+			}
+
+			query_status++;
 
 			/*
 			 * remember this, so next time we need to query we just use
@@ -619,7 +652,10 @@ void AlsaPcm::queryClose()
 	{
 		DLOG(mLog, DEBUG) << "Close pcm query device: " << mDeviceName;
 
-		snd_pcm_close(mHwQueryHandle);
+		if(dev_status == 0 && query_status != 0)
+		{
+			snd_pcm_close(mHwQueryHandle);
+		}
 	}
 
 	if (mHwQueryParams)
@@ -627,6 +663,7 @@ void AlsaPcm::queryClose()
 		snd_pcm_hw_params_free(mHwQueryParams);
 	}
 
+	query_status--;
 	mHwQueryHandle = nullptr;
 	mHwQueryParams = nullptr;
 }
@@ -754,21 +791,24 @@ void AlsaPcm::queryHwParamFormats(snd_pcm_hw_params_t* hwParams,
 		}
 	}
 
-	if ((ret = snd_pcm_hw_params_set_format_mask(mHwQueryHandle, hwParams,
-												 alsa_formats)) < 0)
+	if(mHwQueryHandle)
 	{
-		throw Exception("Can't set format mask " + mDeviceName, -ret);
-	}
-
-	snd_pcm_hw_params_get_format_mask(hwParams, alsa_formats);
-
-	resp.formats = 0;
-
-	for (auto value : sPcmFormat)
-	{
-		if (snd_pcm_format_mask_test(alsa_formats, value.alsa))
+		if ((ret = snd_pcm_hw_params_set_format_mask(mHwQueryHandle, hwParams,
+						alsa_formats)) < 0)
 		{
-			resp.formats |= 1 << value.sndif;
+			throw Exception("Can't set format mask " + mDeviceName, -ret);
+		}
+
+		snd_pcm_hw_params_get_format_mask(hwParams, alsa_formats);
+
+		resp.formats = 0;
+
+		for (auto value : sPcmFormat)
+		{
+			if (snd_pcm_format_mask_test(alsa_formats, value.alsa))
+			{
+				resp.formats |= 1 << value.sndif;
+			}
 		}
 	}
 }
