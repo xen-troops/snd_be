@@ -69,7 +69,10 @@ void AlsaPcm::queryHwRanges(SoundItf::PcmParamRanges& req, SoundItf::PcmParamRan
 
     queryOpen();
 
-    DLOG(mLog, DEBUG) << "Query pcm device " << mDeviceName << " for HW parameters";
+    DLOG(mLog, DEBUG) << "Query pcm device " << mDeviceName << " for HW parameters, formats: " << req.formats
+                      << ", rates: " << req.rates.min << "..." << req.rates.max << ", channels: " << req.channels.min
+                      << "..." << req.channels.max << ", buffer: " << req.buffer.min << "..." << req.buffer.max
+                      << ", period: " << req.period.min << "..." << req.period.max;
 
     snd_pcm_hw_params_alloca(&hwParams);
     snd_pcm_hw_params_copy(hwParams, mHwQueryParams);
@@ -82,6 +85,11 @@ void AlsaPcm::queryHwRanges(SoundItf::PcmParamRanges& req, SoundItf::PcmParamRan
     queryHwParamChannels(hwParams, req, resp);
     queryHwParamBuffer(hwParams, req, resp);
     queryHwParamPeriod(hwParams, req, resp);
+
+    DLOG(mLog, DEBUG) << "Set device " << mDeviceName << " HW parameters, formats: " << resp.formats
+                      << ", rates: " << resp.rates.min << "..." << resp.rates.max << ", channels: " << resp.channels.min
+                      << "..." << resp.channels.max << ", buffer: " << resp.buffer.min << "..." << resp.buffer.max
+                      << ", period: " << resp.period.min << "..." << resp.period.max;
 }
 
 void AlsaPcm::open(const PcmParams& params)
