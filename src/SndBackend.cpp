@@ -20,16 +20,15 @@
 
 #include "SndBackend.hpp"
 
+#include <execinfo.h>
+#include <getopt.h>
+#include <xen/errno.h>
+
+#include <csignal>
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <vector>
-
-#include <csignal>
-#include <execinfo.h>
-#include <getopt.h>
-
-#include <xen/errno.h>
 #include <xen/be/XenStore.hpp>
 
 #ifdef WITH_MOCKBELIB
@@ -38,13 +37,14 @@
 
 #include "Version.hpp"
 
-/***************************************************************************//**
- * @mainpage snd_be
- *
- * This backend implements virtual sound devices. It is implemented with
- * libxenbe.
- *
- ******************************************************************************/
+/***************************************************************************/ /**
+                                                                               * @mainpage snd_be
+                                                                               *
+                                                                               * This backend implements virtual sound
+                                                                               *devices. It is implemented with
+                                                                               * libxenbe.
+                                                                               *
+                                                                               ******************************************************************************/
 
 using std::cout;
 using std::endl;
@@ -61,14 +61,14 @@ using std::vector;
 using XenBackend::FrontendHandlerException;
 using XenBackend::FrontendHandlerPtr;
 using XenBackend::Log;
-using XenBackend::RingBufferPtr;
 using XenBackend::RingBufferInBase;
+using XenBackend::RingBufferPtr;
 using XenBackend::Utils;
 using XenBackend::XenStore;
 
-using SoundItf::StreamType;
 using SoundItf::PcmDevicePtr;
 using SoundItf::PcmType;
+using SoundItf::StreamType;
 
 #ifdef WITH_PULSE
 using Pulse::PulseMainloop;
@@ -76,414 +76,366 @@ using Pulse::PulseMainloop;
 
 string gLogFileName;
 
-/*******************************************************************************
+/***********************************************************************************************************************
  * StreamRingBuffer
- ******************************************************************************/
+ **********************************************************************************************************************/
 
-StreamRingBuffer::StreamRingBuffer(const string& id, PcmDevicePtr pcmDevice,
-								   EventRingBufferPtr eventRingBuffer,
-								   domid_t domId, evtchn_port_t port,
-								   grant_ref_t ref) :
-	RingBufferInBase<xen_sndif_back_ring, xen_sndif_sring,
-					 xensnd_req, xensnd_resp>(domId, port, ref),
-	mId(id),
-	mCommandHandler(pcmDevice, eventRingBuffer, domId),
-	mLog("StreamRing")
+StreamRingBuffer::StreamRingBuffer(const string& id, PcmDevicePtr pcmDevice, EventRingBufferPtr eventRingBuffer,
+                                   domid_t domId, evtchn_port_t port, grant_ref_t ref)
+    : RingBufferInBase<xen_sndif_back_ring, xen_sndif_sring, xensnd_req, xensnd_resp>(domId, port, ref),
+      mId(id),
+      mCommandHandler(pcmDevice, eventRingBuffer, domId),
+      mLog("StreamRing")
 {
-	LOG(mLog, DEBUG) << "Create stream ring buffer, id: " << id;
+    LOG(mLog, DEBUG) << "Create stream ring buffer, id: " << id;
 }
 
 void StreamRingBuffer::processRequest(const xensnd_req& req)
 {
-	DLOG(mLog, DEBUG) << "Request received, id: " << mId
-					  << ", cmd:" << static_cast<int>(req.operation);
+    DLOG(mLog, DEBUG) << "Request received, id: " << mId << ", cmd:" << static_cast<int>(req.operation);
 
-	xensnd_resp rsp {};
+    xensnd_resp rsp{};
 
-	rsp.id = req.id;
-	rsp.operation = req.operation;
-	rsp.status = mCommandHandler.processCommand(req, rsp);
+    rsp.id = req.id;
+    rsp.operation = req.operation;
+    rsp.status = mCommandHandler.processCommand(req, rsp);
 
-	sendResponse(rsp);
+    sendResponse(rsp);
 }
 
-/*******************************************************************************
+/***********************************************************************************************************************
  * SndFrontendHandler
- ******************************************************************************/
-SndFrontendHandler::SndFrontendHandler(const string devName,
-									   domid_t domId, uint16_t devId) :
-	FrontendHandlerBase("SndFrontend", devName, domId, devId),
+ **********************************************************************************************************************/
+SndFrontendHandler::SndFrontendHandler(const string devName, domid_t domId, uint16_t devId)
+    : FrontendHandlerBase("SndFrontend", devName, domId, devId),
 #ifdef WITH_PULSE
-	mPulseMainloop("Dom" + to_string(domId) + ":" + to_string(devId)),
+      mPulseMainloop("Dom" + to_string(domId) + ":" + to_string(devId)),
 #endif
-	mLog("SndFrontend")
+      mLog("SndFrontend")
 {
 }
 
 void SndFrontendHandler::onBind()
 {
-	LOG(mLog, DEBUG) << "onBind";
+    LOG(mLog, DEBUG) << "onBind";
 
-	processCard(getXsFrontendPath() + "/");
+    processCard(getXsFrontendPath() + "/");
 }
 
 void SndFrontendHandler::onClosing()
 {
-	LOG(mLog, DEBUG) << "onClosing";
+    LOG(mLog, DEBUG) << "onClosing";
 }
 
 void SndFrontendHandler::processCard(const std::string& cardPath)
 {
-	int devIndex = 0;
+    int devIndex = 0;
 
-	while(getXenStore().checkIfExist(cardPath + to_string(devIndex)))
-	{
-		LOG(mLog, DEBUG) << "Found device: " << devIndex;
+    while (getXenStore().checkIfExist(cardPath + to_string(devIndex))) {
+        LOG(mLog, DEBUG) << "Found device: " << devIndex;
 
-		processDevice(cardPath + to_string(devIndex) + "/");
+        processDevice(cardPath + to_string(devIndex) + "/");
 
-		devIndex++;
-	}
+        devIndex++;
+    }
 }
 
 void SndFrontendHandler::processDevice(const std::string& devPath)
 {
-	int streamIndex = 0;
+    int streamIndex = 0;
 
-	while(getXenStore().checkIfExist(devPath + to_string(streamIndex)))
-	{
-		LOG(mLog, DEBUG) << "Found stream: " << streamIndex;
+    while (getXenStore().checkIfExist(devPath + to_string(streamIndex))) {
+        LOG(mLog, DEBUG) << "Found stream: " << streamIndex;
 
-		processStream(devPath + to_string(streamIndex) + "/");
+        processStream(devPath + to_string(streamIndex) + "/");
 
-		streamIndex++;
-	}
+        streamIndex++;
+    }
 }
 
 void SndFrontendHandler::processStream(const std::string& streamPath)
 {
-	auto id = getXenStore().readString(streamPath +
-									   XENSND_FIELD_STREAM_UNIQUE_ID);
-	StreamType streamType = StreamType::PLAYBACK;
+    auto id = getXenStore().readString(streamPath + XENSND_FIELD_STREAM_UNIQUE_ID);
+    StreamType streamType = StreamType::PLAYBACK;
 
-	if (getXenStore().readString(streamPath + XENSND_FIELD_TYPE) ==
-		XENSND_STREAM_TYPE_CAPTURE)
-	{
-		streamType = StreamType::CAPTURE;
-	}
+    if (getXenStore().readString(streamPath + XENSND_FIELD_TYPE) == XENSND_STREAM_TYPE_CAPTURE) {
+        streamType = StreamType::CAPTURE;
+    }
 
-	createStream(id, streamType, streamPath);
+    createStream(id, streamType, streamPath);
 }
 
-void SndFrontendHandler::createStream(const string& id, StreamType type,
-									  const string& streamPath)
+void SndFrontendHandler::createStream(const string& id, StreamType type, const string& streamPath)
 {
-	auto reqPort = getXenStore().readInt(streamPath +
-										 XENSND_FIELD_EVT_CHNL);
+    auto reqPort = getXenStore().readInt(streamPath + XENSND_FIELD_EVT_CHNL);
 
-	uint32_t reqRef = getXenStore().readInt(streamPath +
-											XENSND_FIELD_RING_REF);
+    uint32_t reqRef = getXenStore().readInt(streamPath + XENSND_FIELD_RING_REF);
 
-	auto evtPort = getXenStore().readInt(streamPath +
-										 XENSND_FIELD_EVT_EVT_CHNL);
+    auto evtPort = getXenStore().readInt(streamPath + XENSND_FIELD_EVT_EVT_CHNL);
 
-	uint32_t evtRef = getXenStore().readInt(streamPath +
-											XENSND_FIELD_EVT_RING_REF);
+    uint32_t evtRef = getXenStore().readInt(streamPath + XENSND_FIELD_EVT_RING_REF);
 
-	EventRingBufferPtr evtRingBuffer(new EventRingBuffer(
-			getDomId(), evtPort, evtRef, XENSND_IN_RING_OFFS,
-			XENSND_IN_RING_SIZE));
+    EventRingBufferPtr evtRingBuffer(
+        new EventRingBuffer(getDomId(), evtPort, evtRef, XENSND_IN_RING_OFFS, XENSND_IN_RING_SIZE));
 
-	addRingBuffer(evtRingBuffer);
+    addRingBuffer(evtRingBuffer);
 
-	RingBufferPtr reqRingBuffer(
-			new StreamRingBuffer(id, createPcmDevice(type, id),
-								 evtRingBuffer, getDomId(),
-								 reqPort, reqRef));
+    RingBufferPtr reqRingBuffer(
+        new StreamRingBuffer(id, createPcmDevice(type, id), evtRingBuffer, getDomId(), reqPort, reqRef));
 
-	addRingBuffer(reqRingBuffer);
+    addRingBuffer(reqRingBuffer);
 }
 
-PcmDevicePtr SndFrontendHandler::createPcmDevice(StreamType type,
-												 const string& id)
+PcmDevicePtr SndFrontendHandler::createPcmDevice(StreamType type, const string& id)
 {
-	string pcmType;;
-	string deviceName;
-	string propName;
-	string propValue;
+    string pcmType;
+    ;
+    string deviceName;
+    string propName;
+    string propValue;
 
-	parseStreamId(id, pcmType, deviceName, propName, propValue);
+    parseStreamId(id, pcmType, deviceName, propName, propValue);
 
-	transform(pcmType.begin(), pcmType.end(), pcmType.begin(),
-			  (int (*)(int))toupper);
+    transform(pcmType.begin(), pcmType.end(), pcmType.begin(), (int (*)(int))toupper);
 
-	PcmDevicePtr pcmDevice;
+    PcmDevicePtr pcmDevice;
 
-	LOG(mLog, DEBUG) << "Create pcm device, type: " << pcmType
-					 << ", device: " << deviceName
-					 << ", propName: " << propName
-					 << ", propValue: " << propValue;
+    LOG(mLog, DEBUG) << "Create pcm device, type: " << pcmType << ", device: " << deviceName
+                     << ", propName: " << propName << ", propValue: " << propValue;
 
 #ifdef WITH_PULSE
-	if (pcmType == "PULSE" || pcmType.empty())
-	{
-		if (propName.empty())
-		{
-			propName = "media.role";
-		}
+    if (pcmType == "PULSE" || pcmType.empty()) {
+        if (propName.empty()) {
+            propName = "media.role";
+        }
 
-		pcmDevice.reset(mPulseMainloop.createStream(type, id,
-													propName, propValue,
-													deviceName));
-	}
+        pcmDevice.reset(mPulseMainloop.createStream(type, id, propName, propValue, deviceName));
+    }
 #endif
 
 #ifdef WITH_ALSA
-	if (pcmType == "ALSA" || pcmType.empty())
-	{
-		if (deviceName.empty())
-		{
-			deviceName = "default";
-		}
+    if (pcmType == "ALSA" || pcmType.empty()) {
+        if (deviceName.empty()) {
+            deviceName = "default";
+        }
 
-		pcmDevice.reset(new Alsa::AlsaPcm(type, deviceName));
-	}
+        pcmDevice.reset(new Alsa::AlsaPcm(type, deviceName));
+    }
 #endif
 
-	if (!pcmDevice)
-	{
-		throw FrontendHandlerException("Invalid PCM type: " + pcmType, EINVAL);
-	}
+    if (!pcmDevice) {
+        throw FrontendHandlerException("Invalid PCM type: " + pcmType, EINVAL);
+    }
 
-	return pcmDevice;
+    return pcmDevice;
 }
 
-void SndFrontendHandler::parseStreamId(const string& id,
-									   string& pcmType, string& deviceName,
-									   string& propName, string& propValue)
+void SndFrontendHandler::parseStreamId(const string& id, string& pcmType, string& deviceName, string& propName,
+                                       string& propValue)
 {
-	LOG(mLog, DEBUG) << "Parse stream id: " << id;
+    LOG(mLog, DEBUG) << "Parse stream id: " << id;
 
-	string input = id;
+    string input = id;
 
-	pcmType = parsePcmType(input);
-	deviceName = parseDeviceName(input);
-	propName = parsePropName(input);
-	propValue = parsePropValue(input);
+    pcmType = parsePcmType(input);
+    deviceName = parseDeviceName(input);
+    propName = parsePropName(input);
+    propValue = parsePropValue(input);
 }
 
 string SndFrontendHandler::parsePcmType(string& input)
 {
-	if (input.empty())
-	{
-		return string();
-	}
+    if (input.empty()) {
+        return string();
+    }
 
-	auto pos = input.find("<");
-	auto type = input.substr(0, pos);
+    auto pos = input.find("<");
+    auto type = input.substr(0, pos);
 
-	input.erase(0, pos);
+    input.erase(0, pos);
 
-	return type;
+    return type;
 }
 
 string SndFrontendHandler::parseDeviceName(string& input)
 {
-	if (input.empty())
-	{
-		return string();
-	}
+    if (input.empty()) {
+        return string();
+    }
 
-	auto pos = input.find(">");
+    auto pos = input.find(">");
 
-	if (pos == string::npos)
-	{
-		throw FrontendHandlerException("Can't get device name from id: " + input,
-									   EINVAL);
-	}
+    if (pos == string::npos) {
+        throw FrontendHandlerException("Can't get device name from id: " + input, EINVAL);
+    }
 
-	auto device = input.substr(1, pos - 1);
+    auto device = input.substr(1, pos - 1);
 
-	input.erase(0, ++pos);
+    input.erase(0, ++pos);
 
-	replace(device.begin(), device.end(), ';', ',');
+    replace(device.begin(), device.end(), ';', ',');
 
-	return device;
+    return device;
 }
 
 string SndFrontendHandler::parsePropName(string& input)
 {
-	if (input.empty())
-	{
-		return string();
-	}
+    if (input.empty()) {
+        return string();
+    }
 
-	auto pos = input.find(":");
+    auto pos = input.find(":");
 
-	if (pos == string::npos)
-	{
-		return input;
-	}
+    if (pos == string::npos) {
+        return input;
+    }
 
-	auto propName = input.substr(0, pos);
+    auto propName = input.substr(0, pos);
 
-	input.erase(0, ++pos);
+    input.erase(0, ++pos);
 
-	return propName;
+    return propName;
 }
 
 string SndFrontendHandler::parsePropValue(string& input)
 {
-	if (input.empty())
-	{
-		return string();
-	}
+    if (input.empty()) {
+        return string();
+    }
 
-	return input;
+    return input;
 }
 
-/*******************************************************************************
+/***********************************************************************************************************************
  * SndBackend
- ******************************************************************************/
+ **********************************************************************************************************************/
 
 void SndBackend::onNewFrontend(domid_t domId, uint16_t devId)
 {
-	addFrontendHandler(FrontendHandlerPtr(new SndFrontendHandler(
-			getDeviceName(), domId, devId)));
+    addFrontendHandler(FrontendHandlerPtr(new SndFrontendHandler(getDeviceName(), domId, devId)));
 }
 
-/*******************************************************************************
+/***********************************************************************************************************************
  *
- ******************************************************************************/
+ **********************************************************************************************************************/
 
 void segmentationHandler(int sig)
 {
-	void *array[20];
-	size_t size;
+    void* array[20];
+    size_t size;
 
-	LOG("Main", ERROR) << "Segmentation fault!";
+    LOG("Main", ERROR) << "Segmentation fault!";
 
-	size = backtrace(array, 2);
+    size = backtrace(array, 2);
 
-	backtrace_symbols_fd(array, size, STDERR_FILENO);
+    backtrace_symbols_fd(array, size, STDERR_FILENO);
 
-	raise(sig);
+    raise(sig);
 }
 
 void registerSignals()
 {
-	struct sigaction act {};
+    struct sigaction act {};
 
-	act.sa_handler = segmentationHandler;
-	act.sa_flags = SA_RESETHAND;
+    act.sa_handler = segmentationHandler;
+    act.sa_flags = SA_RESETHAND;
 
-	sigaction(SIGSEGV, &act, nullptr);
+    sigaction(SIGSEGV, &act, nullptr);
 }
 
 void waitSignals()
 {
-	sigset_t set;
-	int signal;
+    sigset_t set;
+    int signal;
 
-	sigemptyset(&set);
-	sigaddset(&set, SIGINT);
-	sigaddset(&set, SIGTERM);
-	sigprocmask(SIG_BLOCK, &set, nullptr);
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGTERM);
+    sigprocmask(SIG_BLOCK, &set, nullptr);
 
-	sigwait(&set,&signal);
+    sigwait(&set, &signal);
 }
 
-bool commandLineOptions(int argc, char *argv[])
+bool commandLineOptions(int argc, char* argv[])
 {
-	int opt = -1;
+    int opt = -1;
 
-	while((opt = getopt(argc, argv, "c:v:l:fh?")) != -1)
-	{
-		switch(opt)
-		{
-		case 'v':
+    while ((opt = getopt(argc, argv, "c:v:l:fh?")) != -1) {
+        switch (opt) {
+            case 'v':
 
-			if (!Log::setLogMask(string(optarg)))
-			{
-				return false;
-			}
+                if (!Log::setLogMask(string(optarg))) {
+                    return false;
+                }
 
-			break;
+                break;
 
-		case 'l':
+            case 'l':
 
-			gLogFileName = optarg;
+                gLogFileName = optarg;
 
-			break;
+                break;
 
-		case 'f':
+            case 'f':
 
-			Log::setShowFileAndLine(true);
+                Log::setShowFileAndLine(true);
 
-			break;
+                break;
 
-		default:
+            default:
 
-			return false;
-		}
-	}
+                return false;
+        }
+    }
 
-	return true;
+    return true;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-	try
-	{
-		registerSignals();
+    try {
+        registerSignals();
 
-		if (commandLineOptions(argc, argv))
-		{
-			LOG("Main", INFO) << "backend version:  " << VERSION;
-			LOG("Main", INFO) << "libxenbe version: " << Utils::getVersion();
+        if (commandLineOptions(argc, argv)) {
+            LOG("Main", INFO) << "backend version:  " << VERSION;
+            LOG("Main", INFO) << "libxenbe version: " << Utils::getVersion();
 
-			ofstream logFile;
+            ofstream logFile;
 
-			if (!gLogFileName.empty())
-			{
-				logFile.open(gLogFileName);
-				Log::setStreamBuffer(logFile.rdbuf());
-			}
+            if (!gLogFileName.empty()) {
+                logFile.open(gLogFileName);
+                Log::setStreamBuffer(logFile.rdbuf());
+            }
 
 #ifdef WITH_MOCKBELIB
-			MockBackend mockBackend(0, 1);
+            MockBackend mockBackend(0, 1);
 #endif
 
-			SndBackend sndBackend(XENSND_DRIVER_NAME);
+            SndBackend sndBackend(XENSND_DRIVER_NAME);
 
-			sndBackend.start();
+            sndBackend.start();
 
-			waitSignals();
+            waitSignals();
 
-			sndBackend.stop();
+            sndBackend.stop();
 
-			logFile.close();
-		}
-		else
-		{
-			cout << "Usage: " << argv[0]
-				 << " [-l <file>] [-v <level>]"
-				 << endl;
-			cout << "\t-l -- log file" << endl;
-			cout << "\t-v -- verbose level in format: "
-				 << "<module>:<level>;<module:<level>" << endl;
-			cout << "\t      use * for mask selection:"
-				 << " *:Debug,Mod*:Info" << endl;
-		}
-	}
-	catch(const exception& e)
-	{
-		LOG("Main", ERROR) << e.what();
-	}
-	catch(...)
-	{
-		LOG("Main", ERROR) << "Unknown error";
-	}
+            logFile.close();
+        }
+        else {
+            cout << "Usage: " << argv[0] << " [-l <file>] [-v <level>]" << endl;
+            cout << "\t-l -- log file" << endl;
+            cout << "\t-v -- verbose level in format: "
+                 << "<module>:<level>;<module:<level>" << endl;
+            cout << "\t      use * for mask selection:"
+                 << " *:Debug,Mod*:Info" << endl;
+        }
+    }
+    catch (const exception& e) {
+        LOG("Main", ERROR) << e.what();
+    }
+    catch (...) {
+        LOG("Main", ERROR) << "Unknown error";
+    }
 
-	return 0;
+    return 0;
 }

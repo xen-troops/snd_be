@@ -1,0 +1,10 @@
+{
+  BasedOnStyle: Google,
+  IndentWidth: 4,
+  AccessModifierOffset: -4,
+  BreakBeforeBraces: Stroustrup,
+  ColumnLimit: 120,
+  AllowShortFunctionsOnASingleLine: InlineOnly,
+  DerivePointerAlignment: false,
+  PointerAlignment: Left,
+}

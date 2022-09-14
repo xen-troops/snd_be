@@ -24,27 +24,26 @@
 #include <functional>
 #include <memory>
 #include <string>
-
 #include <xen/be/Log.hpp>
 
 namespace SoundItf {
 
-/***************************************************************************//**
+/***********************************************************************************************************************
  * @defgroup sound
  * Sound interface related classes.
- ******************************************************************************/
+ **********************************************************************************************************************/
 
 /**
  * Specifies stream type
  * @ingroup sound
  */
-enum class StreamType {PLAYBACK, CAPTURE};
+enum class StreamType { PLAYBACK, CAPTURE };
 
 /**
  * Specifies PCM device type
  * @ingroup sound
  */
-enum class PcmType {ALSA, PULSE};
+enum class PcmType { ALSA, PULSE };
 
 /**
  * Progress callback type
@@ -52,119 +51,111 @@ enum class PcmType {ALSA, PULSE};
  */
 typedef std::function<void(uint64_t bytes)> ProgressCbk;
 
-/***************************************************************************//**
+/***********************************************************************************************************************
  * Describes pcm parameters.
  * @ingroup sound
- ******************************************************************************/
-struct PcmParams
-{
-	uint32_t	rate;			//!< rate in Hz
-	uint8_t		format;			//!< pcm format
-	uint8_t		numChannels;	//!< number of channels
-	uint32_t	bufferSize;		//!< buffer size
-	uint32_t	periodSize;		//!< period size
+ **********************************************************************************************************************/
+struct PcmParams {
+    uint32_t rate;        //!< rate in Hz
+    uint8_t format;       //!< pcm format
+    uint8_t numChannels;  //!< number of channels
+    uint32_t bufferSize;  //!< buffer size
+    uint32_t periodSize;  //!< period size
 };
 
-/***************************************************************************//**
+/***********************************************************************************************************************
  * Describes pcm parameter ranges.
  * @ingroup sound
- ******************************************************************************/
-struct PcmParamRanges
-{
-	uint64_t formats;
-	struct
-	{
-		unsigned int min;
-		unsigned int max;
-	} rates;
-	struct
-	{
-		unsigned int min;
-		unsigned int max;
-	} channels;
-	struct
-	{
-		unsigned int min;
-		unsigned int max;
-	} buffer;
-	struct
-	{
-		unsigned int min;
-		unsigned int max;
-	} period;
+ **********************************************************************************************************************/
+struct PcmParamRanges {
+    uint64_t formats;
+    struct {
+        unsigned int min;
+        unsigned int max;
+    } rates;
+    struct {
+        unsigned int min;
+        unsigned int max;
+    } channels;
+    struct {
+        unsigned int min;
+        unsigned int max;
+    } buffer;
+    struct {
+        unsigned int min;
+        unsigned int max;
+    } period;
 };
 
-/***************************************************************************//**
+/***********************************************************************************************************************
  * Provides sound functionality.
  * @ingroup sound
- ******************************************************************************/
-class PcmDevice
-{
+ **********************************************************************************************************************/
+class PcmDevice {
 public:
+    virtual ~PcmDevice() {}
 
-	virtual ~PcmDevice() {}
+    /**
+     * Queries the device for HW intervals and masks.
+     * @req HW parameters that the frontend wants to set
+     * @resp refined HW parameters that backend can support
+     */
+    virtual void queryHwRanges(PcmParamRanges& req, PcmParamRanges& resp) = 0;
 
-	/**
-	 * Queries the device for HW intervals and masks.
-	 * @req HW parameters that the frontend wants to set
-	 * @resp refined HW parameters that backend can support
-	 */
-	virtual void queryHwRanges(PcmParamRanges& req, PcmParamRanges& resp) = 0;
+    /**
+     * Opens the device.
+     * @param params pcm parameters
+     */
+    virtual void open(const PcmParams& params) = 0;
 
-	/**
-	 * Opens the device.
-	 * @param params pcm parameters
-	 */
-	virtual void open(const PcmParams& params) = 0;
+    /**
+     * Closes the device.
+     */
+    virtual void close() = 0;
 
-	/**
-	 * Closes the device.
-	 */
-	virtual void close() = 0;
+    /**
+     * Reads data from the device.
+     * @param buffer buffer where to put data
+     * @param size   number of bytes to read
+     */
+    virtual void read(uint8_t* buffer, size_t size) = 0;
 
-	/**
-	 * Reads data from the device.
-	 * @param buffer buffer where to put data
-	 * @param size   number of bytes to read
-	 */
-	virtual void read(uint8_t* buffer, size_t size) = 0;
+    /**
+     * Writes data to the device.
+     * @param buffer buffer with data
+     * @param size   number of bytes to write
+     */
+    virtual void write(uint8_t* buffer, size_t size) = 0;
 
-	/**
-	 * Writes data to the device.
-	 * @param buffer buffer with data
-	 * @param size   number of bytes to write
-	 */
-	virtual void write(uint8_t* buffer, size_t size) = 0;
+    /**
+     * Starts the pcm device.
+     */
+    virtual void start() = 0;
 
-	/**
-	 * Starts the pcm device.
-	 */
-	virtual void start() = 0;
+    /**
+     * Stops the pcm device.
+     */
+    virtual void stop() = 0;
 
-	/**
-	 * Stops the pcm device.
-	 */
-	virtual void stop() = 0;
+    /**
+     * Pauses the pcm device.
+     */
+    virtual void pause() = 0;
 
-	/**
-	 * Pauses the pcm device.
-	 */
-	virtual void pause() = 0;
+    /**
+     * Resumes the pcm device.
+     */
+    virtual void resume() = 0;
 
-	/**
-	 * Resumes the pcm device.
-	 */
-	virtual void resume() = 0;
-
-	/**
-	 * Sets progress callback.
-	 * @param cbk callback
-	 */
-	virtual void setProgressCbk(ProgressCbk cbk) = 0;
+    /**
+     * Sets progress callback.
+     * @param cbk callback
+     */
+    virtual void setProgressCbk(ProgressCbk cbk) = 0;
 };
 
 typedef std::shared_ptr<PcmDevice> PcmDevicePtr;
 
-}
+}  // namespace SoundItf
 
 #endif /* SRC_SOUNDITF_HPP_ */

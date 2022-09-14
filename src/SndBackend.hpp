@@ -23,8 +23,8 @@
 
 #include <xen/be/BackendBase.hpp>
 #include <xen/be/FrontendHandlerBase.hpp>
-#include <xen/be/RingBufferBase.hpp>
 #include <xen/be/Log.hpp>
+#include <xen/be/RingBufferBase.hpp>
 
 #include "CommandHandler.hpp"
 
@@ -36,114 +36,96 @@
 #include "PulsePcm.hpp"
 #endif
 
-/***************************************************************************//**
+/***********************************************************************************************************************
  * @defgroup snd_be
  * Backend related classes.
- ******************************************************************************/
+ **********************************************************************************************************************/
 
-/***************************************************************************//**
+/***********************************************************************************************************************
  * Ring buffer used for the audio stream.
  * @ingroup snd_be
- ******************************************************************************/
-class StreamRingBuffer : public XenBackend::RingBufferInBase<
-											xen_sndif_back_ring,
-											xen_sndif_sring,
-											xensnd_req,
-											xensnd_resp>
-{
+ **********************************************************************************************************************/
+class StreamRingBuffer
+    : public XenBackend::RingBufferInBase<xen_sndif_back_ring, xen_sndif_sring, xensnd_req, xensnd_resp> {
 public:
-	/**
-	 * @param id    stream id
-	 * @param type  stream type
-	 * @param domId frontend domain id
-	 * @param port  event channel port number
-	 * @param ref   grant table reference
-	 */
-	StreamRingBuffer(const std::string& id,
-					 SoundItf::PcmDevicePtr pcmDevice,
-					 EventRingBufferPtr eventRingBuffer,
-					 domid_t domId, evtchn_port_t port, grant_ref_t ref);
+    /**
+     * @param id    stream id
+     * @param type  stream type
+     * @param domId frontend domain id
+     * @param port  event channel port number
+     * @param ref   grant table reference
+     */
+    StreamRingBuffer(const std::string& id, SoundItf::PcmDevicePtr pcmDevice, EventRingBufferPtr eventRingBuffer,
+                     domid_t domId, evtchn_port_t port, grant_ref_t ref);
 
 private:
-	std::string mId;
-	CommandHandler mCommandHandler;
-	XenBackend::Log mLog;
+    std::string mId;
+    CommandHandler mCommandHandler;
+    XenBackend::Log mLog;
 
-	void processRequest(const xensnd_req& req);
+    void processRequest(const xensnd_req& req);
 };
 
-/***************************************************************************//**
+/***********************************************************************************************************************
  * Sound frontend handler.
  * @ingroup snd_be
- ******************************************************************************/
-class SndFrontendHandler : public XenBackend::FrontendHandlerBase
-{
+ **********************************************************************************************************************/
+class SndFrontendHandler : public XenBackend::FrontendHandlerBase {
 public:
-
-	/**
-	 * @param devName device name
-	 * @param domId frontend domain id
-	 * @param devId   device id
-	 */
-	SndFrontendHandler(const std::string devName,
-					   domid_t domId, uint16_t devId);
+    /**
+     * @param devName device name
+     * @param domId frontend domain id
+     * @param devId   device id
+     */
+    SndFrontendHandler(const std::string devName, domid_t domId, uint16_t devId);
 
 protected:
+    /**
+     * Is called on connected state when ring buffers binding is required.
+     */
+    void onBind() override;
 
-	/**
-	 * Is called on connected state when ring buffers binding is required.
-	 */
-	void onBind() override;
-
-	/**
-	 * Is called on connected state when ring buffers releases are required.
-	 */
-	void onClosing() override;
+    /**
+     * Is called on connected state when ring buffers releases are required.
+     */
+    void onClosing() override;
 
 private:
-
 #ifdef WITH_PULSE
-	Pulse::PulseMainloop mPulseMainloop;
+    Pulse::PulseMainloop mPulseMainloop;
 #endif
 
-	XenBackend::Log mLog;
+    XenBackend::Log mLog;
 
-	SoundItf::PcmDevicePtr createPcmDevice(SoundItf::StreamType type,
-										   const std::string& id);
-	void parseStreamId(const std::string& id,
-					   std::string& pcmType, std::string& deviceName,
-					   std::string& propName, std::string& propValue);
-	std::string parsePcmType(std::string& input);
-	std::string parseDeviceName(std::string& input);
-	std::string parsePropName(std::string& input);
-	std::string parsePropValue(std::string& input);
+    SoundItf::PcmDevicePtr createPcmDevice(SoundItf::StreamType type, const std::string& id);
+    void parseStreamId(const std::string& id, std::string& pcmType, std::string& deviceName, std::string& propName,
+                       std::string& propValue);
+    std::string parsePcmType(std::string& input);
+    std::string parseDeviceName(std::string& input);
+    std::string parsePropName(std::string& input);
+    std::string parsePropValue(std::string& input);
 
-	void createStream(const std::string& id, SoundItf::StreamType type,
-					  const std::string& streamPath);
-	void processCard(const std::string& cardPath);
-	void processDevice(const std::string& devPath);
-	void processStream(const std::string& streamPath);
+    void createStream(const std::string& id, SoundItf::StreamType type, const std::string& streamPath);
+    void processCard(const std::string& cardPath);
+    void processDevice(const std::string& devPath);
+    void processStream(const std::string& streamPath);
 };
 
-/***************************************************************************//**
+/***********************************************************************************************************************
  * Sound backend class.
  * @ingroup snd_be
- ******************************************************************************/
-class SndBackend : public XenBackend::BackendBase
-{
+ **********************************************************************************************************************/
+class SndBackend : public XenBackend::BackendBase {
 public:
-
-	SndBackend(const std::string& deviceName) :
-		BackendBase("SndBackend", deviceName) {}
+    SndBackend(const std::string& deviceName) : BackendBase("SndBackend", deviceName) {}
 
 protected:
-
-	/**
-	 * Is called when new sound frontend appears.
-	 * @param domId domain id
-	 * @param devId device id
-	 */
-	void onNewFrontend(domid_t domId, uint16_t devId) override;
+    /**
+     * Is called when new sound frontend appears.
+     * @param domId domain id
+     * @param devId device id
+     */
+    void onNewFrontend(domid_t domId, uint16_t devId) override;
 };
 
 #endif /* SRC_SNDBACKEND_HPP_ */
