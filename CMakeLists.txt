@@ -8,6 +8,7 @@ project(${PROJECT_NAME})
 # Options
 ################################################################################
 
+OPTION(WITH_PIPEWIRE "build with PipeWire backend" OFF)
 OPTION(WITH_PULSE "build with PulseAudio backend" ON)
 OPTION(WITH_ALSA "build with Alsa backend" ON)
 OPTION(WITH_MOCKBELIB "build with mock backend lib" OFF)
@@ -19,6 +20,7 @@ message(STATUS "CMAKE_BUILD_TYPE              = ${CMAKE_BUILD_TYPE}")
 message(STATUS "CMAKE_INSTALL_PREFIX          = ${CMAKE_INSTALL_PREFIX}")
 message(STATUS)
 message(STATUS "WITH_DOC                      = ${WITH_DOC}")
+message(STATUS "WITH_PIPEWIRE                 = ${WITH_PIPEWIRE}")
 message(STATUS "WITH_PULSE                    = ${WITH_PULSE}")
 message(STATUS "WITH_ALSA                     = ${WITH_ALSA}")
 message(STATUS)
@@ -38,8 +40,10 @@ message(STATUS "XENBEMOCK_LIB_PATH            = ${XENBEMOCK_LIB_PATH}")
 endif()
 message(STATUS)
 
-if(NOT WITH_PULSE AND NOT WITH_ALSA)
-	message(FATAL_ERROR "At least one backend should be specified: WITH_ALSA, WITH_PULSE")
+if(NOT WITH_PIPEWIRE AND NOT WITH_PULSE AND NOT WITH_ALSA)
+	message(FATAL_ERROR "At least one backend should be specified: WITH_ALSA, WITH_PULSE, WITH_PIPEWIRE")
+elseif(WITH_PIPEWIRE AND WITH_PULSE)
+	message(FATAL_ERROR "Both pipewire and pulse backend can not be specified at the same time")
 endif()
 
 ################################################################################
@@ -61,6 +65,10 @@ if(WITH_PULSE)
 	add_definitions(-DWITH_PULSE)
 endif()
 
+if(WITH_PIPEWIRE)
+	add_definitions(-DWITH_PIPEWIRE)
+endif()
+
 if(WITH_MOCKBELIB)
 	add_definitions(-DWITH_MOCKBELIB)
 endif()
@@ -74,6 +82,8 @@ include_directories(
 	${XENBE_INCLUDE_PATH}
 	${XENBEMOCK_INCLUDE_PATH}
 	${CMAKE_CURRENT_BINARY_DIR}
+    /usr/include/pipewire-0.3
+    /usr/include/spa-0.2
 	.
 )
 
