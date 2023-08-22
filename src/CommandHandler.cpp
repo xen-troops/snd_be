@@ -34,6 +34,10 @@
 #include "PulsePcm.hpp"
 #endif
 
+#ifdef WITH_PIPEWIRE
+#include "PipeWirePcm.hpp"
+#endif
+
 using std::bind;
 using std::min;
 using std::out_of_range;

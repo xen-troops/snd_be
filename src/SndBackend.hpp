@@ -36,6 +36,10 @@
 #include "PulsePcm.hpp"
 #endif
 
+#ifdef WITH_PIPEWIRE
+#include "PipeWirePcm.hpp"
+#endif
+
 /***************************************************************************//**
  * @defgroup snd_be
  * Backend related classes.
@@ -104,6 +108,10 @@ private:
 
 #ifdef WITH_PULSE
 	Pulse::PulseMainloop mPulseMainloop;
+#endif
+
+#ifdef WITH_PIPEWIRE
+	PipeWire::PipeWireMainloop mPipeWireMainloop;
 #endif
 
 	XenBackend::Log mLog;

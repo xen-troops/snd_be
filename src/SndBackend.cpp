@@ -74,6 +74,10 @@ using SoundItf::PcmType;
 using Pulse::PulseMainloop;
 #endif
 
+#ifdef WITH_PIPEWIRE
+using PipeWire::PipeWireMainloop;
+#endif
+
 string gLogFileName;
 
 /*******************************************************************************
@@ -115,6 +119,9 @@ SndFrontendHandler::SndFrontendHandler(const string devName,
 	FrontendHandlerBase("SndFrontend", devName, domId, devId),
 #ifdef WITH_PULSE
 	mPulseMainloop("Dom" + to_string(domId) + ":" + to_string(devId)),
+#endif
+#ifdef WITH_PIPEWIRE
+	mPipeWireMainloop("Dom" + to_string(domId) + ":" + to_string(devId)),
 #endif
 	mLog("SndFrontend")
 {
@@ -223,6 +230,20 @@ PcmDevicePtr SndFrontendHandler::createPcmDevice(StreamType type,
 					 << ", device: " << deviceName
 					 << ", propName: " << propName
 					 << ", propValue: " << propValue;
+
+#ifdef WITH_PIPEWIRE
+	if (pcmType == "PIPEWIRE" || pcmType.empty())
+	{
+		if (propName.empty())
+		{
+			propName = "media.role";
+		}
+
+		pcmDevice.reset(mPipeWireMainloop.createStream(type, id,
+													propName, propValue,
+													deviceName));
+	}
+#endif
 
 #ifdef WITH_PULSE
 	if (pcmType == "PULSE" || pcmType.empty())

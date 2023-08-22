@@ -18,6 +18,14 @@ if(WITH_PULSE)
 	endif()
 endif()
 
+if(WITH_PIPEWIRE)
+	pkg_check_modules (PIPEWIRE REQUIRED libpipewire-0.3)
+	if (NOT PIPEWIRE_FOUND)
+		message(FATAL_ERROR "No pipewire found")
+	endif()
+endif()
+
+
 ################################################################################
 # Includes
 ################################################################################
@@ -40,6 +48,12 @@ endif()
 if(WITH_PULSE)
 	list(APPEND SOURCES
 		PulsePcm.cpp
+	)
+endif()
+
+if(WITH_PIPEWIRE)
+	list(APPEND SOURCES
+		PipeWirePcm.cpp
 	)
 endif()
 
@@ -67,6 +81,10 @@ endif()
 
 if(WITH_PULSE)
 	target_link_libraries(${PROJECT_NAME} ${PULSE_LIBRARIES})
+endif()
+
+if(WITH_PIPEWIRE)
+	target_link_libraries(${PROJECT_NAME} ${PIPEWIRE_LIBRARIES})
 endif()
 
 set(XENBE_LIB xenbe)
